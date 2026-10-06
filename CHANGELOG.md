@@ -21,3 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explorer.
 - Exit test proving the stored data is readable with plain DuckDB SQL.
 - `demo-shop` example and a Docker Compose demo (`make demo`).
+- Service page: request, error and latency charts, operations, callers and callees.
+- Service map on the Services page, derived from cross-service parent/child spans.
+- Compaction of closed hours and a `-retention` flag (7 days by default).
+- Unflushed telemetry is queryable immediately.
+- Free-text log search also matches attribute values.
+- Benchmark harness (`make bench`) and first results in `bench/RESULTS.md`.
+
+### Changed
+
+- Parquet files use delta and dictionary encodings where data repeats (smaller files, same
+  logical schema).

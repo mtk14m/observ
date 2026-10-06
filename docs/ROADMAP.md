@@ -6,12 +6,17 @@ Les 3 signaux avancent **ensemble**, phase par phase : on ne fait pas « logs d'
 ## État au 2026-10-07
 
 Une démo de bout en bout tourne (`make demo`) : ingestion OTLP HTTP/gRPC, WAL, Parquet, requêtes
-DuckDB, API et UI (services, logs, traces + waterfall, explorateur de métriques). L'exit test
-passe en CI.
+DuckDB, API et UI (services avec service map et page service, logs, traces + waterfall,
+explorateur de métriques). Les données sont requêtables dès l'ack, la compaction et la rétention
+tournent, et l'exit test passe en CI.
 
-Reste à faire pour terminer les phases 0 et 1 : les benchmarks (`bench/`), le stockage S3, la
-compaction et la rétention, les rollups de métriques, la recherche dans les attributs de logs,
-les buffers chauds requêtables (fraîcheur < 1 s ; elle est de 10 s aujourd'hui) et la service map.
+Premiers benchmarks (`bench/RESULTS.md`) : ingestion très au-delà de la cible, requêtes < 100 ms
+sur une heure de données. Compression : métriques 40× et traces 10× (cibles atteintes), logs 4,6×
+(cible 10× non atteinte, analyse et pistes dans le fichier).
+
+Reste à faire pour terminer les phases 0 et 1 : le stockage S3, les rollups de métriques, la
+table de resources dédupliquées, la décision sur les IDs binaires, la mesure sur la démo
+OpenTelemetry officielle et la comparaison avec OpenObserve et SigNoz.
 
 ## Phase 0 — Valider les choix risqués (3–4 semaines)
 
