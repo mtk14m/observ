@@ -5,7 +5,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mtk14n/obsrv/internal/version.Version=$(VERSION) \
 	-X github.com/mtk14n/obsrv/internal/version.Commit=$(COMMIT)
 
-.PHONY: all build build-go test test-go test-web lint lint-go lint-web fmt web-install web-dev web-build run demo demo-down clean
+.PHONY: all build build-go test test-go test-web lint lint-go lint-web fmt web-install web-dev web-build run bench demo demo-down clean
 
 all: lint test build
 
@@ -47,6 +47,9 @@ web-build: web-install ## Build the UI and stage it for embedding
 	cd web && npm run build
 	find internal/ui/dist -mindepth 1 ! -name .keep -delete
 	cp -R web/dist/. internal/ui/dist/
+
+bench: ## Measure ingestion, storage and queries on generated telemetry
+	$(GO) run ./bench
 
 demo: ## Run obsrv with the demo shop in Docker, then open http://localhost:8080
 	docker compose -f deploy/demo/docker-compose.yml up --build -d
