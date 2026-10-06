@@ -1,0 +1,64 @@
+/*
+ * Design tokens. Components must use these variables, never raw colors.
+ * Dark is the default theme; light applies via prefers-color-scheme or
+ * [data-theme='light'].
+ */
+:root {
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius: 6px;
+
+  /* Dark theme (default) */
+  --bg: #0e0f13;
+  --bg-sidebar: #0a0b0e;
+  --bg-elevated: #16181e;
+  --bg-hover: #1e2129;
+  --border: #23262f;
+  --border-strong: #343845;
+  --text: #e6e8ee;
+  --text-muted: #8b90a0;
+  --accent: #8b6cff;
+  --accent-soft: rgb(139 108 255 / 14%);
+  --shadow: 0 8px 24px rgb(0 0 0 / 45%);
+
+  /* Signals: stable everywhere so users learn them. */
+  --signal-logs: #4cb3ff;
+  --signal-traces: #ffb547;
+  --signal-metrics: #3fd39b;
+
+  /* Status: reserved for meaning, always paired with an icon or label. */
+  --status-ok: #3fd39b;
+  --status-warn: #ffb547;
+  --status-error: #ff5c6c;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #ffffff;
+    --bg-sidebar: #f6f7f9;
+    --bg-elevated: #ffffff;
+    --bg-hover: #eef0f4;
+    --border: #e3e6ec;
+    --border-strong: #c9ced8;
+    --text: #15171c;
+    --text-muted: #5d6475;
+    --accent: #6b47f5;
+    --accent-soft: rgb(107 71 245 / 10%);
+    --shadow: 0 8px 24px rgb(20 24 40 / 12%);
+    --signal-logs: #1a8fe0;
+    --signal-traces: #d98a00;
+    --signal-metrics: #13a571;
+    --status-ok: #13a571;
+    --status-warn: #d98a00;
+    --status-error: #e0303f;
+    color-scheme: light;
+  }
+}
