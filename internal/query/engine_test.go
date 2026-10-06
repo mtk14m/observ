@@ -177,6 +177,11 @@ func TestSearchLogs(t *testing.T) {
 		t.Errorf("level:error = %+v", errs)
 	}
 
+	byAttr, err := e.SearchLogs(t.Context(), query.LogQuery{TimeRange: window, Query: "42"})
+	if err != nil || len(byAttr) != 2 {
+		t.Errorf("free text matching an attribute value = %d records, %v; want 2", len(byAttr), err)
+	}
+
 	before := query.TimeRange{From: base, To: base.Add(5 * time.Minute)}
 	if none, _ := e.SearchLogs(t.Context(), query.LogQuery{TimeRange: before}); len(none) != 0 {
 		t.Errorf("logs outside the range = %+v", none)

@@ -16,9 +16,9 @@ func TestCompile(t *testing.T) {
 	}{
 		{"", "TRUE", nil},
 		{"   ", "TRUE", nil},
-		{"timeout", "contains(lower(body), ?)", []any{"timeout"}},
-		{"Timeout", "contains(lower(body), ?)", []any{"timeout"}},
-		{`"connection reset"`, "contains(lower(body), ?)", []any{"connection reset"}},
+		{"timeout", "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))", []any{"timeout", "timeout"}},
+		{"Timeout", "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))", []any{"timeout", "timeout"}},
+		{`"connection reset"`, "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))", []any{"connection reset", "connection reset"}},
 		{"service:api", "service_name = ?", []any{"api"}},
 		{"level:error", "upper(severity_text) IN (?)", []any{"ERROR"}},
 		{"level:warn,error", "upper(severity_text) IN (?, ?)", []any{"WARN", "ERROR"}},
@@ -27,12 +27,12 @@ func TestCompile(t *testing.T) {
 		{"http.route:/pay", "coalesce(attributes[?], resource_attributes[?]) = ?", []any{"http.route", "http.route", "/pay"}},
 		{`user.name:"Ada L"`, "coalesce(attributes[?], resource_attributes[?]) = ?", []any{"user.name", "user.name", "Ada L"}},
 		{"url.full:http://x:8080/a", "coalesce(attributes[?], resource_attributes[?]) = ?", []any{"url.full", "url.full", "http://x:8080/a"}},
-		{"-health", "NOT (contains(lower(body), ?))", []any{"health"}},
+		{"-health", "NOT (" + "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))" + ")", []any{"health", "health"}},
 		{"-service:api", "NOT (service_name = ?)", []any{"api"}},
 		{
 			`service:api level:error "payment failed" -retry`,
-			"service_name = ? AND upper(severity_text) IN (?) AND contains(lower(body), ?) AND NOT (contains(lower(body), ?))",
-			[]any{"api", "ERROR", "payment failed", "retry"},
+			"service_name = ? AND upper(severity_text) IN (?) AND " + "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))" + " AND NOT (" + "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))" + ")",
+			[]any{"api", "ERROR", "payment failed", "payment failed", "retry", "retry"},
 		},
 	}
 	for _, tt := range tests {

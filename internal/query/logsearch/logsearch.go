@@ -2,8 +2,9 @@
 //
 // The syntax is a list of terms, all of which must match:
 //
-//	timeout               the body contains "timeout" (case-insensitive)
-//	"connection reset"    the body contains the phrase
+//	timeout               the body or an attribute value contains "timeout"
+//	                      (case-insensitive)
+//	"connection reset"    the body or an attribute value contains the phrase
 //	service:api           the service is "api"
 //	level:warn,error      the severity is WARN or ERROR (also status:, severity:)
 //	trace_id:4bf92f…      the record belongs to the trace
@@ -61,7 +62,9 @@ type term struct {
 func compileTerm(t term) (string, []any, error) {
 	switch strings.ToLower(t.key) {
 	case "":
-		return "contains(lower(body), ?)", []any{strings.ToLower(t.value)}, nil
+		v := strings.ToLower(t.value)
+		return "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))",
+			[]any{v, v}, nil
 	case "service":
 		return "service_name = ?", []any{t.value}, nil
 	case "level", "status", "severity":
