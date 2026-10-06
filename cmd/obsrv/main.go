@@ -19,9 +19,12 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
+	"github.com/mtk14n/obsrv/internal/api"
 	"github.com/mtk14n/obsrv/internal/ingest"
 	objfs "github.com/mtk14n/obsrv/internal/objstore/fs"
 	"github.com/mtk14n/obsrv/internal/otlp"
+	"github.com/mtk14n/obsrv/internal/query"
+	"github.com/mtk14n/obsrv/internal/ui"
 	"github.com/mtk14n/obsrv/internal/version"
 )
 
@@ -72,13 +75,19 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	}
 	defer func() { _ = sink.Close() }()
 
+	engine, err := query.New(store)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = engine.Close() }()
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return sink.Run(ctx) })
 	grpcSrv := grpc.NewServer(grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes))
 	otlp.RegisterGRPC(grpcSrv, sink)
 	serveGRPC(ctx, g, log, *otlpGRPCAddr, grpcSrv)
 	serve(ctx, g, log, "otlp-http", *otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{}))
-	serve(ctx, g, log, "api", *httpAddr, newAPIHandler())
+	serve(ctx, g, log, "http", *httpAddr, newAPIHandler(engine))
 	g.Go(func() error { reportStats(ctx, log, sink); return nil })
 	return g.Wait()
 }
@@ -133,11 +142,14 @@ func serveGRPC(ctx context.Context, g *errgroup.Group, log *slog.Logger, addr st
 	})
 }
 
-func newAPIHandler() http.Handler {
+// newAPIHandler serves health checks, the JSON API and the embedded UI.
+func newAPIHandler(q api.Querier) http.Handler {
 	mux := http.NewServeMux()
 	ok := func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok\n") }
 	mux.HandleFunc("GET /healthz", ok)
 	mux.HandleFunc("GET /readyz", ok)
+	mux.Handle("/api/", api.NewHandler(q, api.Options{}))
+	mux.Handle("/", ui.NewHandler(ui.Dist()))
 	return mux
 }
 

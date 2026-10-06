@@ -5,12 +5,17 @@ LDFLAGS   := -s -w \
 	-X github.com/mtk14n/obsrv/internal/version.Version=$(VERSION) \
 	-X github.com/mtk14n/obsrv/internal/version.Commit=$(COMMIT)
 
-.PHONY: all build test test-go test-web lint lint-go lint-web fmt web-install web-dev web-build clean
+.PHONY: all build build-go test test-go test-web lint lint-go lint-web fmt web-install web-dev web-build run demo demo-down clean
 
 all: lint test build
 
-build: ## Build the obsrv binary into ./bin
+build: web-build build-go ## Build the obsrv binary with the embedded UI into ./bin
+
+build-go: ## Build the obsrv binary without rebuilding the UI
 	$(GO) build -trimpath -ldflags '$(LDFLAGS)' -o bin/obsrv ./cmd/obsrv
+
+run: build ## Build and run obsrv locally with data in ./data
+	./bin/obsrv -data-dir ./data
 
 test: test-go test-web ## Run all tests
 
@@ -38,8 +43,11 @@ web-install:
 web-dev:
 	cd web && npm run dev
 
-web-build: web-install
+web-build: web-install ## Build the UI and stage it for embedding
 	cd web && npm run build
+	find internal/ui/dist -mindepth 1 ! -name .keep -delete
+	cp -R web/dist/. internal/ui/dist/
 
 clean:
 	rm -rf bin web/dist
+	find internal/ui/dist -mindepth 1 ! -name .keep -delete

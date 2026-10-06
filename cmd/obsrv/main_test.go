@@ -27,10 +27,10 @@ func TestUnknownFlagFails(t *testing.T) {
 }
 
 func TestHealthEndpoints(t *testing.T) {
-	srv := httptest.NewServer(newAPIHandler())
+	srv := httptest.NewServer(newAPIHandler(nil))
 	defer srv.Close()
 
-	for _, path := range []string{"/healthz", "/readyz"} {
+	for _, path := range []string{"/healthz", "/readyz", "/", "/logs"} {
 		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+path, nil)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {

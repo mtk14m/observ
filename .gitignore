@@ -12,6 +12,8 @@ coverage.*
 web/node_modules/
 web/dist/
 web/coverage/
+internal/ui/dist/*
+!internal/ui/dist/.keep
 
 # Editors and OS
 .idea/
