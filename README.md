@@ -1,42 +1,96 @@
-# obsrv
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+    <img src="docs/images/logo-light.svg" alt="obsrv" width="232" height="64">
+  </picture>
+</p>
 
-**Logs, metrics and traces in a single container. OpenTelemetry-native. Your data stays yours.**
+<p align="center">
+  <strong>Logs, metrics and traces in a single container.</strong><br>
+  OpenTelemetry-native. Your data stays yours, in open formats.
+</p>
 
-[![CI](https://github.com/mtk14n/obsrv/actions/workflows/ci.yml/badge.svg)](https://github.com/mtk14n/obsrv/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/mtk14n/obsrv/actions/workflows/ci.yml"><img src="https://github.com/mtk14n/obsrv/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
+  <img src="https://img.shields.io/badge/OpenTelemetry-native-7b5cff.svg" alt="OpenTelemetry native">
+  <img src="https://img.shields.io/badge/status-early%20development-orange.svg" alt="Status: early development">
+</p>
 
-> **Status: early development.** obsrv is not usable in production yet. APIs, storage format and
-> configuration will change without notice until v1.0. Follow the [roadmap](docs/ROADMAP.md).
+<p align="center">
+  <a href="#try-the-demo">Try the demo</a> ·
+  <a href="#a-quick-tour">Tour</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/services-light.png">
+  <img src="docs/images/services.png" alt="The obsrv Services page: a service map of frontend, checkout, inventory and payment, and a table of request rates, error rates and latency percentiles">
+</picture>
+
+> [!WARNING]
+> obsrv is in early development and is not ready for production. The API, the storage format and
+> the configuration may change without notice until v1.0.
 
 ## Why obsrv
 
-- **All-in-one.** Ingestion, storage, query, UI, dashboards and alerting ship as one binary in one container.
+- **All-in-one.** Ingestion, storage, queries and the web UI ship as one binary in one container.
   You don't need Postgres, ClickHouse, Kafka or Grafana.
-- **OpenTelemetry-native.** OTLP is the only way in, so you use the official OpenTelemetry SDKs and Collector.
-  There is no proprietary agent or SDK, ever.
-- **Simple to query.** A visual query builder, SQL for power users and a simple log search syntax.
-  You don't need to learn PromQL.
-- **No lock-in.** Data is stored as Apache Parquet with a [public, versioned schema](docs/ARCHITECTURE.md#4-stockage--le-contrat-public),
-  on local disk or in your own S3 bucket. You can read it with DuckDB, Spark or anything else, even when obsrv is not running.
+- **OpenTelemetry-native.** OTLP is the only way in. Use the official OpenTelemetry SDKs and
+  Collector, never a proprietary agent.
+- **Simple to query.** Use a visual metrics explorer and a short log search syntax
+  (`service:api level:error "timeout"`). You don't need PromQL or a query language to learn.
+- **Correlated.** Go from a service to its slow requests, from a trace to its logs, from an error to
+  the call that caused it, in a click.
+- **No lock-in.** Telemetry is stored as Apache Parquet with a [public schema](pkg/schema/schema.go),
+  on your disk. Any tool can read it, even when obsrv is not running, and a test in CI guarantees it.
+
+## A quick tour
+
+### Follow a request across services
+
+The waterfall shows where the time went and where it failed. The logs of the trace are listed under it.
+
+![A trace waterfall: the payment service was slow and then refused the card, so checkout failed](docs/images/trace.png)
+
+### See every service at a glance
+
+Each service has its own page: request rate, error rate and latency over time, its operations, and
+the services it calls or is called by.
+
+![The checkout service page with request, error rate and latency charts, operations and dependencies](docs/images/service.png)
+
+### Search logs
+
+Search with a short syntax, see the volume by severity, and open any line to see its attributes and its trace.
+
+![The logs page with a volume histogram by severity and a list of log records](docs/images/logs.png)
+
+### Explore metrics without a query language
+
+Pick a metric, an aggregation and a grouping. Counters become rates and histograms give percentiles.
+
+![The metrics explorer showing the p95 request duration grouped by service](docs/images/metrics.png)
 
 ## Try the demo
 
 You need Docker. This starts obsrv and a small shop made of four services (frontend, checkout,
-inventory, payment) instrumented with the official OpenTelemetry SDK:
+inventory, payment) instrumented with the official OpenTelemetry SDK. The payment service is slow
+from time to time and sometimes refuses cards, so there is something to investigate.
 
 ```sh
-make demo        # or: docker compose -f deploy/demo/docker-compose.yml up --build
+make demo        # or: docker compose -f deploy/demo/docker-compose.yml up --build -d
 ```
 
-Open <http://localhost:8080>. Data appears within about 15 seconds. Things to try:
+Open <http://localhost:8080>. Data appears within seconds. Things to try:
 
-1. **Services**: checkout has around 9% errors and a slow p95. Click it.
-2. **Traces**: tick *Errors only*, open a trace and look at the waterfall: the payment call failed.
-   The logs of that trace are listed under the waterfall.
-3. **Logs**: search `level:error`, or `service:payment "refused"`. Click a line to see its
-   attributes and jump to its trace.
-4. **Metrics**: pick `http.server.request.duration`, show `p95` by `service.name`.
-5. **Leave whenever you want**: the data is plain Parquet. Query it with DuckDB, without obsrv:
+1. **Services**: checkout has about 10% errors. Click it.
+2. **Traces**: tick *Errors only* and open a trace. The payment call failed, and its logs are under the waterfall.
+3. **Logs**: search `level:error`, or `service:payment "refused"`. Click a line, then *View trace*.
+4. **Metrics**: pick `http.server.request.duration` and show the `p95` by `service.name`.
+5. **Leave whenever you want**: the data is plain Parquet. You can query it with DuckDB, without obsrv:
 
    ```sh
    docker compose -f deploy/demo/docker-compose.yml cp obsrv:/data/store ./obsrv-data
@@ -47,35 +101,72 @@ Stop and delete everything with `make demo-down`.
 
 ## Send your own telemetry
 
-Run obsrv (`docker run -p 4317:4317 -p 4318:4318 -p 8080:8080 -v obsrv:/data <image>`, or
-`make run` from source), then point any OpenTelemetry SDK or Collector at it:
+Run obsrv from source (`make run`) or with Docker, then point any OpenTelemetry SDK or Collector at it:
 
 ```sh
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # OTLP/HTTP, or :4317 for OTLP/gRPC
 ```
 
-## Building from source
+| Port | Purpose |
+|---|---|
+| 4317 | OTLP/gRPC |
+| 4318 | OTLP/HTTP (protobuf and JSON) |
+| 8080 | Web UI and `/api/v1` |
 
-Requirements: Go (see `go.mod`) with cgo (a C compiler, for the embedded DuckDB), Node.js 22+,
-`make`.
+Useful flags: `-data-dir` (default `./data`) and `-retention` (default `168h`).
 
-```sh
-make test      # run all tests
-make build     # build ./bin/obsrv with the embedded UI
-make run       # build and run with data in ./data
+## How it works
+
+```mermaid
+flowchart LR
+    apps["Your services<br/>(OpenTelemetry SDKs)"] -- "OTLP gRPC / HTTP" --> wal
+    subgraph obsrv ["obsrv: one process, one container"]
+        wal["Write-ahead log<br/>ack after fsync"] --> parquet["Parquet files<br/>by signal and hour"]
+        parquet --> compactor["Compaction<br/>and retention"]
+        parquet --> duckdb["Embedded DuckDB"]
+        duckdb --> ui["JSON API and web UI"]
+    end
+    parquet -. "open format" .-> tools["DuckDB · Spark · Snowflake · …"]
 ```
 
-## Documentation
+- **Durable.** A batch is acknowledged only once it is written to the write-ahead log. After a crash,
+  unflushed data is replayed.
+- **Fresh.** Data is queryable as soon as it is acknowledged.
+- **Compact.** Rows are sorted and stored as ZSTD-compressed Parquet. Small files are merged once an hour is complete.
+- **Fast enough on a laptop.** On one hour of generated telemetry (about 900K items), every query
+  answers in under 100 ms. See the [benchmark results](bench/RESULTS.md), including where we miss our targets.
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Design principles](docs/DESIGN.md)
-- [Architecture Decision Records](docs/adr/)
+Read more in the [architecture document](docs/ARCHITECTURE.md) and the [decision records](docs/adr/).
+
+## Building from source
+
+Requirements: Go (see `go.mod`) with cgo, meaning a C compiler for the embedded DuckDB, Node.js 22+, and `make`.
+
+```sh
+make test      # Go and web tests
+make lint      # linters and type checks
+make build     # ./bin/obsrv with the embedded UI
+make run       # build and run with data in ./data
+make bench     # measure ingestion, storage and queries
+```
+
+The repository is organised as follows:
+
+| Path | Contents |
+|---|---|
+| `cmd/obsrv` | The binary |
+| `internal/` | Ingestion, WAL, storage, compaction, queries, API |
+| `pkg/schema` | The public storage schema |
+| `web/` | The web UI (Vue 3, TypeScript) |
+| `examples/demo-shop` | The instrumented demo application |
+| `bench/` | Benchmark harness and results |
+| `docs/` | Architecture, roadmap, design principles, ADRs |
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md) first.
-To report a security vulnerability, follow [SECURITY.md](SECURITY.md) and do not open a public issue.
+Contributions are welcome. We practice test-driven development and use Conventional Commits with
+DCO sign-off. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+To report a vulnerability, follow [SECURITY.md](SECURITY.md) rather than opening a public issue.
 
 ## License
 

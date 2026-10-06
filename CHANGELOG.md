@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unflushed telemetry is queryable immediately.
 - Free-text log search also matches attribute values.
 - Benchmark harness (`make bench`) and first results in `bench/RESULTS.md`.
+- "Past 30 minutes" time range preset and a favicon for the web UI.
 
 ### Changed
 
