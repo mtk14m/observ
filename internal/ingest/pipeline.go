@@ -14,6 +14,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,8 +54,14 @@ type Options struct {
 	// MaxBufferedRows is the per-signal limit above which ingestion applies
 	// backpressure. Defaults to 500,000.
 	MaxBufferedRows int
-	Now             func() time.Time
-	Logger          *slog.Logger
+	// HotDir holds snapshots of unflushed rows for queries. Defaults to
+	// WALDir/hot. It is cleared on start.
+	HotDir string
+	// HotRefresh rate-limits snapshot rebuilds. Zero or negative rebuilds a
+	// snapshot as soon as the buffer changed.
+	HotRefresh time.Duration
+	Now        func() time.Time
+	Logger     *slog.Logger
 }
 
 // Stats counts the items received per signal.
@@ -78,6 +86,19 @@ type Pipeline struct {
 	flushMu sync.Mutex
 	flushCh chan struct{}
 
+	// Rows swapped out by an in-progress Flush, still visible to queries.
+	flushingLogs   []schema.Log
+	flushingSpans  []schema.Span
+	flushingPoints []schema.MetricPoint
+	// gen counts buffer changes per signal directory; epoch counts flushes.
+	gen   map[string]uint64
+	epoch uint64
+
+	hotMu   sync.Mutex
+	hot     map[string]*snapshot
+	hotPrev map[string]string
+	hotSeq  uint64
+
 	nSpans, nPoints, nLogs atomic.Int64
 }
 
@@ -96,11 +117,23 @@ func New(opts Options) (*Pipeline, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.New(slog.DiscardHandler)
 	}
+	if opts.HotDir == "" {
+		opts.HotDir = filepath.Join(opts.WALDir, "hot")
+	}
+	if err := os.RemoveAll(opts.HotDir); err != nil {
+		return nil, fmt.Errorf("ingest: clear hot dir: %w", err)
+	}
+	if err := os.MkdirAll(opts.HotDir, 0o750); err != nil {
+		return nil, fmt.Errorf("ingest: create hot dir: %w", err)
+	}
 	w, err := wal.Open(opts.WALDir)
 	if err != nil {
 		return nil, err
 	}
-	p := &Pipeline{opts: opts, wal: w, flushCh: make(chan struct{}, 1)}
+	p := &Pipeline{
+		opts: opts, wal: w, flushCh: make(chan struct{}, 1),
+		gen: map[string]uint64{}, hot: map[string]*snapshot{}, hotPrev: map[string]string{},
+	}
 	if err := w.Replay(p.replay); err != nil {
 		_ = w.Close()
 		return nil, fmt.Errorf("ingest: replay: %w", err)
@@ -114,7 +147,7 @@ func (p *Pipeline) ConsumeLogs(_ context.Context, ld plog.Logs) error {
 	rows := model.Logs(ld, now)
 	return p.consume(kindLogs, len(rows), now, func() ([]byte, error) {
 		return (&plog.ProtoMarshaler{}).MarshalLogs(ld)
-	}, func() { p.logs = append(p.logs, rows...) }, &p.nLogs)
+	}, func() { p.logs = append(p.logs, rows...); p.gen[layout.Logs]++ }, &p.nLogs)
 }
 
 // ConsumeTraces implements otlp.Sink.
@@ -122,7 +155,7 @@ func (p *Pipeline) ConsumeTraces(_ context.Context, td ptrace.Traces) error {
 	rows := model.Spans(td)
 	return p.consume(kindTraces, len(rows), p.opts.Now(), func() ([]byte, error) {
 		return (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
-	}, func() { p.spans = append(p.spans, rows...) }, &p.nSpans)
+	}, func() { p.spans = append(p.spans, rows...); p.gen[layout.Spans]++ }, &p.nSpans)
 }
 
 // ConsumeMetrics implements otlp.Sink.
@@ -130,7 +163,7 @@ func (p *Pipeline) ConsumeMetrics(_ context.Context, md pmetric.Metrics) error {
 	rows := model.MetricPoints(md)
 	return p.consume(kindMetrics, len(rows), p.opts.Now(), func() ([]byte, error) {
 		return (&pmetric.ProtoMarshaler{}).MarshalMetrics(md)
-	}, func() { p.points = append(p.points, rows...) }, &p.nPoints)
+	}, func() { p.points = append(p.points, rows...); p.gen[layout.MetricPoints]++ }, &p.nPoints)
 }
 
 func (p *Pipeline) consume(kind byte, n int, now time.Time, marshal func() ([]byte, error), buffer func(), counter *atomic.Int64) error {
@@ -218,6 +251,7 @@ func (p *Pipeline) Flush(ctx context.Context) error {
 	p.bufMu.Lock()
 	logs, spans, points := p.logs, p.spans, p.points
 	p.logs, p.spans, p.points = nil, nil, nil
+	p.flushingLogs, p.flushingSpans, p.flushingPoints = logs, spans, points
 	p.bufMu.Unlock()
 	p.mu.Unlock()
 
@@ -229,12 +263,17 @@ func (p *Pipeline) Flush(ctx context.Context) error {
 	failedSpans, errSpans := writeByHour(ctx, p, layout.Spans, spans, model.SpanTime)
 	failedPoints, errPoints := writeByHour(ctx, p, layout.MetricPoints, points, model.PointTime)
 
-	if err := errors.Join(errLogs, errSpans, errPoints); err != nil {
-		p.bufMu.Lock()
+	err = errors.Join(errLogs, errSpans, errPoints)
+	p.bufMu.Lock()
+	if err != nil {
 		p.logs = append(failedLogs, p.logs...)
 		p.spans = append(failedSpans, p.spans...)
 		p.points = append(failedPoints, p.points...)
-		p.bufMu.Unlock()
+	}
+	p.flushingLogs, p.flushingSpans, p.flushingPoints = nil, nil, nil
+	p.epoch++
+	p.bufMu.Unlock()
+	if err != nil {
 		return err
 	}
 	if err := p.wal.Remove(seal); err != nil {
@@ -309,18 +348,21 @@ func (p *Pipeline) replay(rec []byte) error {
 			return err
 		}
 		p.logs = append(p.logs, model.Logs(ld, receivedAt)...)
+		p.gen[layout.Logs]++
 	case kindTraces:
 		td, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
 		if err != nil {
 			return err
 		}
 		p.spans = append(p.spans, model.Spans(td)...)
+		p.gen[layout.Spans]++
 	case kindMetrics:
 		md, err := (&pmetric.ProtoUnmarshaler{}).UnmarshalMetrics(body)
 		if err != nil {
 			return err
 		}
 		p.points = append(p.points, model.MetricPoints(md)...)
+		p.gen[layout.MetricPoints]++
 	}
 	return nil
 }

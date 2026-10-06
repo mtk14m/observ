@@ -77,7 +77,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	}
 	defer func() { _ = sink.Close() }()
 
-	engine, err := query.New(store)
+	engine, err := query.New(store, query.WithHot(sink))
 	if err != nil {
 		return err
 	}

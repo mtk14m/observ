@@ -40,19 +40,35 @@ func (r TimeRange) bounds() (from, to int64) {
 	return r.From.UnixNano(), r.To.UnixNano()
 }
 
+// HotSource exposes Parquet snapshots of data not yet in the store.
+type HotSource interface {
+	HotFiles(dir string) ([]string, error)
+}
+
+// Option configures an Engine.
+type Option func(*Engine)
+
+// WithHot makes unflushed data queryable.
+func WithHot(h HotSource) Option { return func(e *Engine) { e.hot = h } }
+
 // Engine runs queries over the Parquet files of a FileSource.
 type Engine struct {
 	db  *sql.DB
 	src FileSource
+	hot HotSource
 }
 
 // New opens an in-memory DuckDB instance to query src.
-func New(src FileSource) (*Engine, error) {
+func New(src FileSource, opts ...Option) (*Engine, error) {
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		return nil, fmt.Errorf("query: open duckdb: %w", err)
 	}
-	return &Engine{db: db, src: src}, nil
+	e := &Engine{db: db, src: src}
+	for _, o := range opts {
+		o(e)
+	}
+	return e, nil
 }
 
 // Close releases DuckDB.
@@ -75,6 +91,13 @@ func (e *Engine) files(ctx context.Context, dir string, r TimeRange) ([]string, 
 			continue
 		}
 		paths = append(paths, e.src.LocalPath(info.Key))
+	}
+	if e.hot != nil {
+		hot, err := e.hot.HotFiles(dir)
+		if err != nil {
+			return nil, fmt.Errorf("query: hot %s: %w", dir, err)
+		}
+		paths = append(paths, hot...)
 	}
 	return paths, nil
 }
