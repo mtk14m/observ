@@ -6,6 +6,12 @@ test('histograms default to p95, gauges to average', () => {
   expect(aggregations({ type: 'Gauge' })[0]!.value).toBe('avg')
 })
 
+test('counters are shown as a total rate by default', () => {
+  const opts = aggregations({ type: 'Sum', monotonic: true })
+  expect(opts[0]).toEqual({ value: 'sum', label: 'rate (total)' })
+  expect(opts.map((o) => o.value)).toEqual(['sum', 'avg', 'max', 'min'])
+})
+
 test('value formatting follows units and rates', () => {
   const m = { name: 'd', type: 'Histogram', unit: 's', series: 1, attribute_keys: [], monotonic: false }
   expect(valueFormatter(m, 'p95', false)(0.25)).toBe('250 ms')

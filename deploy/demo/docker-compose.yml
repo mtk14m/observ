@@ -1,0 +1,51 @@
+# obsrv demo: obsrv plus a small shop made of four services instrumented
+# with the official OpenTelemetry SDK, sending traces, metrics and logs.
+#
+#   docker compose -f deploy/demo/docker-compose.yml up --build
+#   open http://localhost:8080
+name: obsrv-demo
+
+x-shop: &shop
+  build: ../../examples/demo-shop
+  restart: unless-stopped
+  depends_on:
+    obsrv:
+      condition: service_healthy
+  environment: &shop-env
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://obsrv:4318
+    OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=demo,service.version=1.4.2
+    DEMO_ADDR: ":8000"
+
+services:
+  obsrv:
+    build: ../..
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8080:8080"
+    volumes:
+      - obsrv-data:/data
+
+  frontend:
+    <<: *shop
+    environment:
+      <<: *shop-env
+      DEMO_ROLE: frontend
+  checkout:
+    <<: *shop
+    environment:
+      <<: *shop-env
+      DEMO_ROLE: checkout
+  inventory:
+    <<: *shop
+    environment:
+      <<: *shop-env
+      DEMO_ROLE: inventory
+  payment:
+    <<: *shop
+    environment:
+      <<: *shop-env
+      DEMO_ROLE: payment
+
+volumes:
+  obsrv-data:

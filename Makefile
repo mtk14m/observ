@@ -48,6 +48,13 @@ web-build: web-install ## Build the UI and stage it for embedding
 	find internal/ui/dist -mindepth 1 ! -name .keep -delete
 	cp -R web/dist/. internal/ui/dist/
 
+demo: ## Run obsrv with the demo shop in Docker, then open http://localhost:8080
+	docker compose -f deploy/demo/docker-compose.yml up --build -d
+	@echo "obsrv is starting: open http://localhost:8080 (data appears within ~15 seconds)"
+
+demo-down: ## Stop the demo and delete its data
+	docker compose -f deploy/demo/docker-compose.yml down -v
+
 clean:
 	rm -rf bin web/dist
 	find internal/ui/dist -mindepth 1 ! -name .keep -delete

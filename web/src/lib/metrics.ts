@@ -25,6 +25,14 @@ export function aggregations(m: Pick<MetricInfo, 'type'> & { monotonic?: boolean
         { value: 'count', label: 'count per second' },
       ]
     default:
+      if (m.type === 'Sum' && m.monotonic) {
+        return [
+          { value: 'sum', label: 'rate (total)' },
+          { value: 'avg', label: 'rate (average per series)' },
+          { value: 'max', label: 'rate (max series)' },
+          { value: 'min', label: 'rate (min series)' },
+        ]
+      }
       return [
         { value: 'avg', label: 'average' },
         { value: 'sum', label: 'sum' },

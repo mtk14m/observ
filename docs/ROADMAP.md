@@ -3,6 +3,16 @@
 Chaque phase a un **critère de sortie**. On ne passe pas à la suivante sans l'avoir atteint.
 Les 3 signaux avancent **ensemble**, phase par phase : on ne fait pas « logs d'abord », pour ne jamais se retrouver avec un signal oublié.
 
+## État au 2026-10-07
+
+Une démo de bout en bout tourne (`make demo`) : ingestion OTLP HTTP/gRPC, WAL, Parquet, requêtes
+DuckDB, API et UI (services, logs, traces + waterfall, explorateur de métriques). L'exit test
+passe en CI.
+
+Reste à faire pour terminer les phases 0 et 1 : les benchmarks (`bench/`), le stockage S3, la
+compaction et la rétention, les rollups de métriques, la recherche dans les attributs de logs,
+les buffers chauds requêtables (fraîcheur < 1 s ; elle est de 10 s aujourd'hui) et la service map.
+
 ## Phase 0 — Valider les choix risqués (3–4 semaines)
 
 - Pipeline minimal pour les 3 signaux : OTLP → pdata → WAL → Arrow → Parquet → disque local.

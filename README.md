@@ -19,24 +19,50 @@
 - **No lock-in.** Data is stored as Apache Parquet with a [public, versioned schema](docs/ARCHITECTURE.md#4-stockage--le-contrat-public),
   on local disk or in your own S3 bucket. You can read it with DuckDB, Spark or anything else, even when obsrv is not running.
 
-## Quick start
+## Try the demo
 
-The quick start below describes the target experience. It is not available yet.
+You need Docker. This starts obsrv and a small shop made of four services (frontend, checkout,
+inventory, payment) instrumented with the official OpenTelemetry SDK:
 
 ```sh
-docker run -p 4317:4317 -p 4318:4318 -p 8080:8080 -v obsrv:/data ghcr.io/mtk14n/obsrv
+make demo        # or: docker compose -f deploy/demo/docker-compose.yml up --build
 ```
 
-Point any OpenTelemetry SDK or Collector at `http://localhost:4318`, then open <http://localhost:8080>.
+Open <http://localhost:8080>. Data appears within about 15 seconds. Things to try:
+
+1. **Services**: checkout has around 9% errors and a slow p95. Click it.
+2. **Traces**: tick *Errors only*, open a trace and look at the waterfall: the payment call failed.
+   The logs of that trace are listed under the waterfall.
+3. **Logs**: search `level:error`, or `service:payment "refused"`. Click a line to see its
+   attributes and jump to its trace.
+4. **Metrics**: pick `http.server.request.duration`, show `p95` by `service.name`.
+5. **Leave whenever you want**: the data is plain Parquet. Query it with DuckDB, without obsrv:
+
+   ```sh
+   docker compose -f deploy/demo/docker-compose.yml cp obsrv:/data/store ./obsrv-data
+   duckdb -c "SELECT service_name, count(*) FROM './obsrv-data/v1/spans/**/*.parquet' GROUP BY 1"
+   ```
+
+Stop and delete everything with `make demo-down`.
+
+## Send your own telemetry
+
+Run obsrv (`docker run -p 4317:4317 -p 4318:4318 -p 8080:8080 -v obsrv:/data <image>`, or
+`make run` from source), then point any OpenTelemetry SDK or Collector at it:
+
+```sh
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # OTLP/HTTP, or :4317 for OTLP/gRPC
+```
 
 ## Building from source
 
-Requirements: Go (see `go.mod`), Node.js 22+, `make`.
+Requirements: Go (see `go.mod`) with cgo (a C compiler, for the embedded DuckDB), Node.js 22+,
+`make`.
 
 ```sh
 make test      # run all tests
-make build     # build ./bin/obsrv
-./bin/obsrv -version
+make build     # build ./bin/obsrv with the embedded UI
+make run       # build and run with data in ./data
 ```
 
 ## Documentation

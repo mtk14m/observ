@@ -23,7 +23,10 @@ jobs:
         with:
           version: v2.13
       - name: Build
-        run: make build
+        run: make build-go
+      - name: Build the demo app
+        working-directory: examples/demo-shop
+        run: go vet ./... && go build ./...
 
   web:
     runs-on: ubuntu-latest
