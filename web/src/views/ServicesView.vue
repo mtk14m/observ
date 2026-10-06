@@ -4,9 +4,11 @@ import { useQuery } from '@/composables/useQuery'
 import { api } from '@/lib/api'
 import { formatCompact, formatMs, formatPercent, formatRate } from '@/lib/format'
 import StatusMessage from '@/components/StatusMessage.vue'
+import ServiceMap from '@/components/ServiceMap.vue'
 
-const { range } = useTimeRange()
+const { range, query } = useTimeRange()
 const services = useQuery(() => ({ ...range.value }), (r) => api.services(r))
+const edges = useQuery(() => ({ ...range.value }), (r) => api.serviceMap(r))
 </script>
 
 <template>
@@ -22,7 +24,14 @@ const services = useQuery(() => ({ ...range.value }), (r) => api.services(r))
       <pre class="hint"><code>OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318</code></pre>
     </StatusMessage>
 
-    <table v-else-if="services.data.value" class="table">
+    <template v-else-if="services.data.value">
+    <ServiceMap
+      v-if="edges.data.value?.length"
+      :edges="edges.data.value"
+      :services="services.data.value"
+      :query="query"
+    />
+    <table class="table">
       <thead>
         <tr>
           <th>Service</th>
@@ -37,7 +46,7 @@ const services = useQuery(() => ({ ...range.value }), (r) => api.services(r))
       <tbody>
         <tr v-for="s in services.data.value" :key="s.name">
           <td>
-            <RouterLink :to="{ path: '/traces', query: { ...range, service: s.name } }" class="name">{{ s.name }}</RouterLink>
+            <RouterLink :to="{ path: `/services/${s.name}`, query }" class="name">{{ s.name }}</RouterLink>
           </td>
           <td class="num">{{ formatCompact(s.requests) }}</td>
           <td class="num">{{ formatRate(s.rate_per_second) }}</td>
@@ -50,6 +59,7 @@ const services = useQuery(() => ({ ...range.value }), (r) => api.services(r))
         </tr>
       </tbody>
     </table>
+    </template>
   </div>
 </template>
 

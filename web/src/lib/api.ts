@@ -12,6 +12,45 @@ export interface ServiceSummary {
   p99_ms: number
 }
 
+export interface TimelinePoint {
+  t: number
+  requests: number
+  errors: number
+  p50_ms: number
+  p95_ms: number
+  p99_ms: number
+}
+
+export interface Operation {
+  name: string
+  requests: number
+  errors: number
+  p50_ms: number
+  p95_ms: number
+}
+
+export interface Dependency {
+  service: string
+  requests: number
+  errors: number
+}
+
+export interface ServiceDetail {
+  summary: ServiceSummary
+  step: number
+  timeline: TimelinePoint[]
+  operations: Operation[]
+  calls: Dependency[]
+  called_by: Dependency[]
+}
+
+export interface Edge {
+  from: string
+  to: string
+  requests: number
+  errors: number
+}
+
 export interface LogRecord {
   time: number
   service: string
@@ -129,6 +168,11 @@ async function get<T>(path: string, range: TimeRange | null, params: [string, Pa
 
 export const api = {
   services: (range: TimeRange) => get<ServiceSummary[]>('/api/v1/services', range),
+
+  service: (range: TimeRange, name: string) =>
+    get<ServiceDetail>(`/api/v1/services/${encodeURIComponent(name)}`, range),
+
+  serviceMap: (range: TimeRange) => get<Edge[]>('/api/v1/service-map', range),
 
   logs: (range: TimeRange, q: string, limit?: number) =>
     get<LogRecord[]>('/api/v1/logs', range, [['q', q], ['limit', limit]]),

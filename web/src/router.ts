@@ -5,6 +5,7 @@ import ServicesView from './views/ServicesView.vue'
 import LogsView from './views/LogsView.vue'
 import TracesView from './views/TracesView.vue'
 import TraceView from './views/TraceView.vue'
+import ServiceView from './views/ServiceView.vue'
 import MetricsView from './views/MetricsView.vue'
 
 const views: Record<string, RouteRecordRaw['component']> = {
@@ -24,6 +25,7 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: section.name },
   })),
   { path: '/traces/:id', name: 'Trace', component: TraceView, meta: { title: 'Trace' } },
+  { path: '/services/:name', name: 'Service', component: ServiceView, meta: { title: 'Service' } },
 ]
 
 export function createAppRouter() {

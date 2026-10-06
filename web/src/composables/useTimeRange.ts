@@ -18,9 +18,12 @@ export function useTimeRange() {
     return DEFAULT_RANGE
   })
 
+  /** The range as URL query parameters, to carry it across links. */
+  const query = computed<Record<string, string>>(() => ({ from: range.value.from, to: range.value.to }))
+
   function setRange(next: TimeRange) {
     return router.push({ query: { ...route.query, from: next.from, to: next.to } })
   }
 
-  return { range, setRange }
+  return { range, query, setRange }
 }
