@@ -20,7 +20,7 @@ describe('TimeRangePicker', () => {
     const { wrapper, router } = await render()
     await wrapper.get('button').trigger('click')
     const options = wrapper.findAll('[role="option"]')
-    expect(options.length).toBe(7)
+    expect(options.length).toBe(8)
 
     await options.find((o) => o.text() === 'Past 4 hours')!.trigger('click')
     await flushPromises()

@@ -22,7 +22,13 @@ const pos = computed(
 const width = computed(() => layout.value.columns * (NODE_W + COL_GAP) - COL_GAP)
 // Edges that skip columns bend below the boxes, into this extra space.
 const BEND = NODE_H / 2 + ROW_GAP
-const height = computed(() => layout.value.rows * (NODE_H + ROW_GAP) - ROW_GAP + BEND)
+const height = computed(() => {
+  const rowsHeight = layout.value.rows * (NODE_H + ROW_GAP) - ROW_GAP
+  const lowestRow = Math.max(0, ...layout.value.nodes.map((n) => n.row))
+  // A bent edge dips about 1.2 × BEND below its row's center.
+  const bentBottom = lowestRow * (NODE_H + ROW_GAP) + NODE_H / 2 + 1.25 * BEND
+  return paths.value.some((p) => p.skipped) ? Math.max(rowsHeight, bentBottom) : rowsHeight
+})
 const column = computed(() => new Map(layout.value.nodes.map((n) => [n.name, n.column])))
 const maxRequests = computed(() => Math.max(1, ...props.edges.map((e) => e.requests)))
 
@@ -43,6 +49,7 @@ const paths = computed(() =>
         : `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2 - 6},${y2}`
       return {
         edge: e,
+        skipped,
         d,
         width: 1 + 3 * Math.sqrt(e.requests / maxRequests.value),
         failing: e.errors / Math.max(e.requests, 1) > 0.01,

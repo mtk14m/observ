@@ -14,6 +14,7 @@ export interface Preset {
 
 export const PRESETS: readonly Preset[] = [
   { from: 'now-15m', label: 'Past 15 minutes' },
+  { from: 'now-30m', label: 'Past 30 minutes' },
   { from: 'now-1h', label: 'Past 1 hour' },
   { from: 'now-4h', label: 'Past 4 hours' },
   { from: 'now-1d', label: 'Past 1 day' },
