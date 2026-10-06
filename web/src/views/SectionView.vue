@@ -8,9 +8,8 @@ defineProps<{ section: Section }>()
 <template>
   <section class="empty">
     <AppIcon :name="section.icon" class="glyph" />
-    <h2>No {{ section.name.toLowerCase() }} yet</h2>
+    <h2>{{ section.name }}</h2>
     <p>{{ section.hint }}</p>
-    <pre><code>OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318</code></pre>
   </section>
 </template>
 
