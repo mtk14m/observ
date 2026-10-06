@@ -1,0 +1,38 @@
+name: Bug report
+description: Report something that does not work as expected
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `docker run ...`
+        2. Send telemetry with ...
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: obsrv version
+      description: Output of `obsrv -version`
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, container runtime, storage backend (local disk or S3 provider), OpenTelemetry SDK/Collector versions.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: shell

@@ -1,0 +1,21 @@
+# Build output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# Local data
+/data/
+
+# Web
+web/node_modules/
+web/dist/
+web/coverage/
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.swp
