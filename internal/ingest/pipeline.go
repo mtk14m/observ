@@ -9,35 +9,26 @@ package ingest
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
 	"github.com/mtk14n/obsrv/internal/encoding/parquet"
+	"github.com/mtk14n/obsrv/internal/layout"
 	"github.com/mtk14n/obsrv/internal/model"
 	"github.com/mtk14n/obsrv/internal/objstore"
 	"github.com/mtk14n/obsrv/internal/otlp"
 	"github.com/mtk14n/obsrv/internal/wal"
 	"github.com/mtk14n/obsrv/pkg/schema"
-)
-
-// Storage directories of each signal, under schema.Version.
-const (
-	DirLogs         = "logs"
-	DirSpans        = "spans"
-	DirMetricPoints = "metric_points"
 )
 
 const (
@@ -230,20 +221,13 @@ func (p *Pipeline) Flush(ctx context.Context) error {
 	p.bufMu.Unlock()
 	p.mu.Unlock()
 
-	slices.SortFunc(logs, func(a, b schema.Log) int {
-		return cmp.Or(cmp.Compare(a.ServiceName, b.ServiceName), cmp.Compare(a.TimeUnixNano, b.TimeUnixNano))
-	})
-	slices.SortFunc(spans, func(a, b schema.Span) int {
-		return cmp.Or(cmp.Compare(a.TraceID, b.TraceID), cmp.Compare(a.StartTimeUnixNano, b.StartTimeUnixNano))
-	})
-	slices.SortFunc(points, func(a, b schema.MetricPoint) int {
-		return cmp.Or(cmp.Compare(a.MetricName, b.MetricName), cmp.Compare(a.SeriesID, b.SeriesID),
-			cmp.Compare(a.TimeUnixNano, b.TimeUnixNano))
-	})
+	model.SortLogs(logs)
+	model.SortSpans(spans)
+	model.SortMetricPoints(points)
 
-	failedLogs, errLogs := writeByHour(ctx, p, DirLogs, logs, func(r schema.Log) int64 { return r.TimeUnixNano })
-	failedSpans, errSpans := writeByHour(ctx, p, DirSpans, spans, func(r schema.Span) int64 { return r.StartTimeUnixNano })
-	failedPoints, errPoints := writeByHour(ctx, p, DirMetricPoints, points, func(r schema.MetricPoint) int64 { return r.TimeUnixNano })
+	failedLogs, errLogs := writeByHour(ctx, p, layout.Logs, logs, model.LogTime)
+	failedSpans, errSpans := writeByHour(ctx, p, layout.Spans, spans, model.SpanTime)
+	failedPoints, errPoints := writeByHour(ctx, p, layout.MetricPoints, points, model.PointTime)
 
 	if err := errors.Join(errLogs, errSpans, errPoints); err != nil {
 		p.bufMu.Lock()
@@ -263,18 +247,21 @@ func (p *Pipeline) Flush(ctx context.Context) error {
 // their order) and returns the rows it failed to write.
 func writeByHour[T any](ctx context.Context, p *Pipeline, dir string, rows []T, at func(T) int64) ([]T, error) {
 	groups := map[string][]T{}
+	hours := map[string]time.Time{}
 	var order []string
 	for _, r := range rows {
-		part := time.Unix(0, at(r)).UTC().Format("date=2006-01-02/hour=15")
+		t := time.Unix(0, at(r))
+		part := layout.Partition(t)
 		if _, ok := groups[part]; !ok {
 			order = append(order, part)
+			hours[part] = t
 		}
 		groups[part] = append(groups[part], r)
 	}
 	var failed []T
 	var errs []error
 	for _, part := range order {
-		key := fmt.Sprintf("%s/%s/%s/%s.parquet", schema.Version, dir, part, ulid.Make())
+		key := layout.NewKey(dir, hours[part])
 		var buf bytes.Buffer
 		err := parquet.Write(&buf, groups[part])
 		if err == nil {

@@ -10,10 +10,9 @@ import (
 
 	_ "github.com/duckdb/duckdb-go/v2" // registers the "duckdb" driver
 
-	"github.com/mtk14n/obsrv/internal/ingest"
+	"github.com/mtk14n/obsrv/internal/layout"
 	"github.com/mtk14n/obsrv/internal/objstore"
 	"github.com/mtk14n/obsrv/internal/query/logsearch"
-	"github.com/mtk14n/obsrv/pkg/schema"
 )
 
 const (
@@ -62,33 +61,22 @@ func (e *Engine) Close() error { return e.db.Close() }
 // files returns the local paths of the files of a signal that may hold data
 // in r, using the date/hour partitions of their keys.
 func (e *Engine) files(ctx context.Context, dir string, r TimeRange) ([]string, error) {
-	infos, err := e.src.List(ctx, schema.Version+"/"+dir+"/")
+	infos, err := e.src.List(ctx, layout.Prefix(dir))
 	if err != nil {
 		return nil, fmt.Errorf("query: list %s: %w", dir, err)
 	}
 	var paths []string
 	for _, info := range infos {
-		if !strings.HasSuffix(info.Key, ".parquet") {
+		k, ok := layout.ParseKey(info.Key)
+		if !ok {
 			continue
 		}
-		if !r.From.IsZero() {
-			if hour, ok := partitionHour(info.Key); ok &&
-				(!hour.Add(time.Hour).After(r.From) || !hour.Before(r.To)) {
-				continue
-			}
+		if !r.From.IsZero() && (!k.Hour.Add(time.Hour).After(r.From) || !k.Hour.Before(r.To)) {
+			continue
 		}
 		paths = append(paths, e.src.LocalPath(info.Key))
 	}
 	return paths, nil
-}
-
-func partitionHour(key string) (time.Time, bool) {
-	i := strings.Index(key, "date=")
-	if i < 0 || len(key) < i+len("date=2006-01-02/hour=15") {
-		return time.Time{}, false
-	}
-	t, err := time.Parse("date=2006-01-02/hour=15", key[i:i+len("date=2006-01-02/hour=15")])
-	return t, err == nil
 }
 
 // source builds a DuckDB table expression over paths.
@@ -115,7 +103,7 @@ type ServiceSummary struct {
 // Services returns request, error and latency statistics per service,
 // computed from server, consumer and root spans.
 func (e *Engine) Services(ctx context.Context, r TimeRange) ([]ServiceSummary, error) {
-	paths, err := e.files(ctx, ingest.DirSpans, r)
+	paths, err := e.files(ctx, layout.Spans, r)
 	if err != nil || len(paths) == 0 {
 		return []ServiceSummary{}, err
 	}
@@ -181,7 +169,7 @@ func (e *Engine) SearchLogs(ctx context.Context, q LogQuery) ([]LogRecord, error
 	if err != nil {
 		return nil, err
 	}
-	paths, err := e.files(ctx, ingest.DirLogs, q.TimeRange)
+	paths, err := e.files(ctx, layout.Logs, q.TimeRange)
 	if err != nil || len(paths) == 0 {
 		return []LogRecord{}, err
 	}
@@ -226,7 +214,7 @@ func (e *Engine) LogHistogram(ctx context.Context, q LogQuery, step time.Duratio
 	if err != nil {
 		return nil, err
 	}
-	paths, err := e.files(ctx, ingest.DirLogs, q.TimeRange)
+	paths, err := e.files(ctx, layout.Logs, q.TimeRange)
 	if err != nil || len(paths) == 0 {
 		return []HistogramBucket{}, err
 	}
@@ -285,7 +273,7 @@ type TraceSummary struct {
 
 // SearchTraces returns matching traces, most recent first.
 func (e *Engine) SearchTraces(ctx context.Context, q TraceQuery) ([]TraceSummary, error) {
-	paths, err := e.files(ctx, ingest.DirSpans, q.TimeRange)
+	paths, err := e.files(ctx, layout.Spans, q.TimeRange)
 	if err != nil || len(paths) == 0 {
 		return []TraceSummary{}, err
 	}
@@ -368,7 +356,7 @@ type SpanEvent struct {
 // Trace returns every span of a trace, ordered by start time. A zero range
 // scans every file.
 func (e *Engine) Trace(ctx context.Context, traceID string, r TimeRange) ([]Span, error) {
-	paths, err := e.files(ctx, ingest.DirSpans, r)
+	paths, err := e.files(ctx, layout.Spans, r)
 	if err != nil || len(paths) == 0 {
 		return []Span{}, err
 	}
@@ -414,7 +402,7 @@ type MetricInfo struct {
 
 // Metrics lists the metrics with data in r.
 func (e *Engine) Metrics(ctx context.Context, r TimeRange) ([]MetricInfo, error) {
-	paths, err := e.files(ctx, ingest.DirMetricPoints, r)
+	paths, err := e.files(ctx, layout.MetricPoints, r)
 	if err != nil || len(paths) == 0 {
 		return []MetricInfo{}, err
 	}
@@ -468,7 +456,7 @@ func (e *Engine) QueryMetric(ctx context.Context, q MetricQuery) ([]Series, erro
 		q.Step = NiceStep(q.To.Sub(q.From), 120)
 	}
 	scan := TimeRange{From: q.From.Add(-counterLookback), To: q.To}
-	paths, err := e.files(ctx, ingest.DirMetricPoints, scan)
+	paths, err := e.files(ctx, layout.MetricPoints, scan)
 	if err != nil || len(paths) == 0 {
 		return []Series{}, err
 	}
