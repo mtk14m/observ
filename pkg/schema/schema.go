@@ -6,6 +6,10 @@
 // breaking changes require a new major version directory (v2/).
 //
 // Version 1 is a draft until obsrv 1.0.
+//
+// Physical encodings (delta, dictionary, byte stream split) are chosen for
+// compression and may change without notice: they never change the logical
+// types or column names that readers depend on.
 package schema
 
 // Version is the storage schema version, used as the top-level key prefix.
@@ -13,17 +17,17 @@ const Version = "v1"
 
 // Log is one OpenTelemetry log record.
 type Log struct {
-	TimeUnixNano         int64             `parquet:"time_unix_nano"`
-	ObservedTimeUnixNano int64             `parquet:"observed_time_unix_nano"`
+	TimeUnixNano         int64             `parquet:"time_unix_nano,delta"`
+	ObservedTimeUnixNano int64             `parquet:"observed_time_unix_nano,delta"`
 	ServiceName          string            `parquet:"service_name,dict"`
-	SeverityNumber       int32             `parquet:"severity_number"`
+	SeverityNumber       int32             `parquet:"severity_number,dict"`
 	SeverityText         string            `parquet:"severity_text,dict"`
 	Body                 string            `parquet:"body"`
 	TraceID              string            `parquet:"trace_id"`
 	SpanID               string            `parquet:"span_id"`
 	ScopeName            string            `parquet:"scope_name,dict"`
-	Attributes           map[string]string `parquet:"attributes"`
-	ResourceAttributes   map[string]string `parquet:"resource_attributes"`
+	Attributes           map[string]string `parquet:"attributes" parquet-key:",dict"`
+	ResourceAttributes   map[string]string `parquet:"resource_attributes" parquet-key:",dict" parquet-value:",dict"`
 }
 
 // Span is one OpenTelemetry span.
@@ -33,23 +37,23 @@ type Span struct {
 	ParentSpanID       string            `parquet:"parent_span_id"`
 	Name               string            `parquet:"name,dict"`
 	Kind               string            `parquet:"kind,dict"`
-	StartTimeUnixNano  int64             `parquet:"start_time_unix_nano"`
-	EndTimeUnixNano    int64             `parquet:"end_time_unix_nano"`
-	DurationNano       int64             `parquet:"duration_nano"`
+	StartTimeUnixNano  int64             `parquet:"start_time_unix_nano,delta"`
+	EndTimeUnixNano    int64             `parquet:"end_time_unix_nano,delta"`
+	DurationNano       int64             `parquet:"duration_nano,delta"`
 	StatusCode         string            `parquet:"status_code,dict"`
 	StatusMessage      string            `parquet:"status_message"`
 	ServiceName        string            `parquet:"service_name,dict"`
 	ScopeName          string            `parquet:"scope_name,dict"`
-	Attributes         map[string]string `parquet:"attributes"`
-	ResourceAttributes map[string]string `parquet:"resource_attributes"`
+	Attributes         map[string]string `parquet:"attributes" parquet-key:",dict"`
+	ResourceAttributes map[string]string `parquet:"resource_attributes" parquet-key:",dict" parquet-value:",dict"`
 	Events             []SpanEvent       `parquet:"events"`
 }
 
 // SpanEvent is an event recorded on a span, such as an exception.
 type SpanEvent struct {
-	TimeUnixNano int64             `parquet:"time_unix_nano"`
+	TimeUnixNano int64             `parquet:"time_unix_nano,delta"`
 	Name         string            `parquet:"name"`
-	Attributes   map[string]string `parquet:"attributes"`
+	Attributes   map[string]string `parquet:"attributes" parquet-key:",dict"`
 }
 
 // Metric types, as named by the OpenTelemetry data model.
@@ -78,14 +82,14 @@ type MetricPoint struct {
 	Unit               string            `parquet:"unit,dict"`
 	Temporality        string            `parquet:"temporality,dict"`
 	IsMonotonic        bool              `parquet:"is_monotonic"`
-	SeriesID           int64             `parquet:"series_id"`
+	SeriesID           int64             `parquet:"series_id,dict"`
 	ServiceName        string            `parquet:"service_name,dict"`
 	ScopeName          string            `parquet:"scope_name,dict"`
-	Attributes         map[string]string `parquet:"attributes"`
-	ResourceAttributes map[string]string `parquet:"resource_attributes"`
-	StartTimeUnixNano  int64             `parquet:"start_time_unix_nano"`
-	TimeUnixNano       int64             `parquet:"time_unix_nano"`
-	Value              float64           `parquet:"value"`
+	Attributes         map[string]string `parquet:"attributes" parquet-key:",dict"`
+	ResourceAttributes map[string]string `parquet:"resource_attributes" parquet-key:",dict" parquet-value:",dict"`
+	StartTimeUnixNano  int64             `parquet:"start_time_unix_nano,delta"`
+	TimeUnixNano       int64             `parquet:"time_unix_nano,delta"`
+	Value              float64           `parquet:"value,split"`
 	Count              int64             `parquet:"count"`
 	Sum                float64           `parquet:"sum"`
 	Min                *float64          `parquet:"min,optional"`
