@@ -47,7 +47,7 @@ func TestServeStopsOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- run(ctx, []string{"-otlp-http-addr", "127.0.0.1:0", "-http-addr", "127.0.0.1:0"}, &bytes.Buffer{})
+		done <- run(ctx, []string{"-otlp-grpc-addr", "127.0.0.1:0", "-otlp-http-addr", "127.0.0.1:0", "-http-addr", "127.0.0.1:0"}, &bytes.Buffer{})
 	}()
 	cancel()
 	if err := <-done; err != nil {

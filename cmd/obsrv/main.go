@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 
 	"github.com/mtk14n/obsrv/internal/ingest"
 	"github.com/mtk14n/obsrv/internal/otlp"
@@ -39,6 +40,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	fs.SetOutput(out)
 	var (
 		showVersion  = fs.Bool("version", false, "print version and exit")
+		otlpGRPCAddr = fs.String("otlp-grpc-addr", ":4317", "listen address for OTLP/gRPC")
 		otlpHTTPAddr = fs.String("otlp-http-addr", ":4318", "listen address for OTLP/HTTP")
 		httpAddr     = fs.String("http-addr", ":8080", "listen address for the API and UI")
 	)
@@ -55,6 +57,9 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 
 	sink := &ingest.Counter{}
 	g, ctx := errgroup.WithContext(ctx)
+	grpcSrv := grpc.NewServer(grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes))
+	otlp.RegisterGRPC(grpcSrv, sink)
+	serveGRPC(ctx, g, log, *otlpGRPCAddr, grpcSrv)
 	serve(ctx, g, log, "otlp-http", *otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{}))
 	serve(ctx, g, log, "api", *httpAddr, newAPIHandler())
 	g.Go(func() error { reportStats(ctx, log, sink); return nil })
@@ -88,6 +93,26 @@ func serve(ctx context.Context, g *errgroup.Group, log *slog.Logger, name, addr 
 			return fmt.Errorf("%s: %w", name, err)
 		}
 		return nil
+	})
+}
+
+// serveGRPC runs the gRPC server until ctx is done, then stops it gracefully.
+func serveGRPC(ctx context.Context, g *errgroup.Group, log *slog.Logger, addr string, srv *grpc.Server) {
+	g.Go(func() error {
+		ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", addr)
+		if err != nil {
+			return fmt.Errorf("otlp-grpc: listen: %w", err)
+		}
+		log.Info("listening", "server", "otlp-grpc", "addr", ln.Addr().String())
+		errc := make(chan error, 1)
+		go func() { errc <- srv.Serve(ln) }()
+		select {
+		case err := <-errc:
+			return fmt.Errorf("otlp-grpc: %w", err)
+		case <-ctx.Done():
+			srv.GracefulStop()
+			return nil
+		}
 	})
 }
 
