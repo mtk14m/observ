@@ -170,3 +170,9 @@ func (s *Store) List(ctx context.Context, prefix string) ([]objstore.ObjectInfo,
 func (s *Store) path(key string) string {
 	return filepath.Join(s.root, filepath.FromSlash(key))
 }
+
+// LocalPath returns the path of the file holding the object with key. It
+// lets local readers such as DuckDB open objects directly.
+func (s *Store) LocalPath(key string) string {
+	return s.path(key)
+}

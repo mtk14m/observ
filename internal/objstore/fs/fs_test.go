@@ -69,3 +69,18 @@ func TestDeleteRemovesEmptyParentDirectories(t *testing.T) {
 		t.Errorf("root must never be removed: %v", err)
 	}
 }
+
+func TestLocalPathPointsToTheObjectFile(t *testing.T) {
+	root := t.TempDir()
+	s, err := fs.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Put(t.Context(), "a/b.parquet", stringsReader("x")); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(s.LocalPath("a/b.parquet"))
+	if err != nil || string(b) != "x" {
+		t.Errorf("LocalPath content = %q, %v; want %q", b, err, "x")
+	}
+}
