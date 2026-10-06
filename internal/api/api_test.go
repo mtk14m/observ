@@ -28,6 +28,16 @@ func (f *fakeQuerier) Services(_ context.Context, r query.TimeRange) ([]query.Se
 	return []query.ServiceSummary{{Name: "api", Requests: 3}}, f.err
 }
 
+func (f *fakeQuerier) ServiceDetail(_ context.Context, name string, r query.TimeRange, step time.Duration) (query.ServiceDetail, error) {
+	f.last = []any{name, r, step}
+	return query.ServiceDetail{Summary: query.ServiceSummary{Name: name, Requests: 1}}, f.err
+}
+
+func (f *fakeQuerier) ServiceMap(_ context.Context, r query.TimeRange) ([]query.Edge, error) {
+	f.last = r
+	return []query.Edge{{From: "a", To: "b", Requests: 2}}, f.err
+}
+
 func (f *fakeQuerier) SearchLogs(_ context.Context, q query.LogQuery) ([]query.LogRecord, error) {
 	f.last = q
 	if q.Query == `"bad` {
@@ -196,5 +206,43 @@ func TestInternalErrorsAreReported(t *testing.T) {
 	code, body := get(t, &fakeQuerier{err: fmt.Errorf("disk on fire")}, "/api/v1/metrics")
 	if code != http.StatusInternalServerError || body["error"] == "" {
 		t.Errorf("status %d body %v, want 500 with error", code, body)
+	}
+}
+
+func TestServiceDetail(t *testing.T) {
+	q := &fakeQuerier{}
+	code, body := get(t, q, "/api/v1/services/checkout?step=1m")
+	if code != http.StatusOK || !reflect.DeepEqual(q.last, []any{"checkout", lastHour, time.Minute}) {
+		t.Errorf("status %d, call %+v", code, q.last)
+	}
+	if body["data"].(map[string]any)["summary"].(map[string]any)["name"] != "checkout" {
+		t.Errorf("body = %v", body)
+	}
+}
+
+func TestServiceDetailNotFound(t *testing.T) {
+	q := &unknownServiceQuerier{}
+	h := api.NewHandler(q, api.Options{Now: func() time.Time { return now }})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/services/ghost", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", rec.Code)
+	}
+}
+
+type unknownServiceQuerier struct{ fakeQuerier }
+
+func (*unknownServiceQuerier) ServiceDetail(_ context.Context, name string, _ query.TimeRange, _ time.Duration) (query.ServiceDetail, error) {
+	return query.ServiceDetail{Summary: query.ServiceSummary{Name: name}}, nil
+}
+
+func TestServiceMap(t *testing.T) {
+	q := &fakeQuerier{}
+	code, body := get(t, q, "/api/v1/service-map")
+	if code != http.StatusOK || !reflect.DeepEqual(q.last, lastHour) {
+		t.Errorf("status %d, call %+v", code, q.last)
+	}
+	if body["data"].([]any)[0].(map[string]any)["from"] != "a" {
+		t.Errorf("body = %v", body)
 	}
 }

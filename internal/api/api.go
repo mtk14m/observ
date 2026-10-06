@@ -23,6 +23,8 @@ import (
 // Querier answers the API's questions. *query.Engine implements it.
 type Querier interface {
 	Services(ctx context.Context, r query.TimeRange) ([]query.ServiceSummary, error)
+	ServiceDetail(ctx context.Context, name string, r query.TimeRange, step time.Duration) (query.ServiceDetail, error)
+	ServiceMap(ctx context.Context, r query.TimeRange) ([]query.Edge, error)
 	SearchLogs(ctx context.Context, q query.LogQuery) ([]query.LogRecord, error)
 	LogHistogram(ctx context.Context, q query.LogQuery, step time.Duration) ([]query.HistogramBucket, error)
 	SearchTraces(ctx context.Context, q query.TraceQuery) ([]query.TraceSummary, error)
@@ -49,6 +51,8 @@ func NewHandler(q Querier, opts Options) http.Handler {
 	h := &handler{q: q, now: opts.Now}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/services", h.services)
+	mux.HandleFunc("GET /api/v1/services/{name}", h.serviceDetail)
+	mux.HandleFunc("GET /api/v1/service-map", h.serviceMap)
 	mux.HandleFunc("GET /api/v1/logs", h.logs)
 	mux.HandleFunc("GET /api/v1/logs/histogram", h.logHistogram)
 	mux.HandleFunc("GET /api/v1/traces", h.traces)
@@ -70,6 +74,35 @@ func (h *handler) services(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := h.q.Services(r.Context(), tr)
+	write(w, data, err)
+}
+
+func (h *handler) serviceDetail(w http.ResponseWriter, r *http.Request) {
+	tr, err := h.timeRange(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	step, err := durationParam(r, "step")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	data, err := h.q.ServiceDetail(r.Context(), r.PathValue("name"), tr, step)
+	if err == nil && data.Summary.Requests == 0 {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no requests for this service in the time range"})
+		return
+	}
+	write(w, data, err)
+}
+
+func (h *handler) serviceMap(w http.ResponseWriter, r *http.Request) {
+	tr, err := h.timeRange(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	data, err := h.q.ServiceMap(r.Context(), tr)
 	write(w, data, err)
 }
 
