@@ -408,6 +408,8 @@ type MetricInfo struct {
 	Unit          string   `json:"unit"`
 	Series        int64    `json:"series"`
 	AttributeKeys []string `json:"attribute_keys"`
+	// Monotonic is true for counters, which are queried as rates.
+	Monotonic bool `json:"monotonic"`
 }
 
 // Metrics lists the metrics with data in r.
@@ -419,7 +421,8 @@ func (e *Engine) Metrics(ctx context.Context, r TimeRange) ([]MetricInfo, error)
 	from, to := r.bounds()
 	rows, err := e.db.QueryContext(ctx, `
 		SELECT metric_name, any_value(type), any_value(unit), count(DISTINCT series_id),
-		       to_json(list_sort(list_distinct(flatten(list(map_keys(attributes))))))::VARCHAR
+		       to_json(list_sort(list_distinct(flatten(list(map_keys(attributes))))))::VARCHAR,
+		       bool_or(is_monotonic)
 		FROM `+source(paths)+`
 		WHERE time_unix_nano >= ? AND time_unix_nano < ?
 		GROUP BY metric_name
@@ -433,7 +436,7 @@ func (e *Engine) Metrics(ctx context.Context, r TimeRange) ([]MetricInfo, error)
 	for rows.Next() {
 		var m MetricInfo
 		var keys string
-		if err := rows.Scan(&m.Name, &m.Type, &m.Unit, &m.Series, &keys); err != nil {
+		if err := rows.Scan(&m.Name, &m.Type, &m.Unit, &m.Series, &keys, &m.Monotonic); err != nil {
 			return nil, fmt.Errorf("query: metrics: %w", err)
 		}
 		_ = json.Unmarshal([]byte(keys), &m.AttributeKeys)

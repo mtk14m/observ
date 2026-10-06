@@ -251,6 +251,9 @@ func TestMetrics(t *testing.T) {
 	if len(got) != 2 || got[0].Name != "orders" || got[1].Name != "queue.size" {
 		t.Fatalf("metrics = %+v", got)
 	}
+	if !got[0].Monotonic || got[1].Monotonic {
+		t.Errorf("monotonic flags = %v, %v; want true for the counter only", got[0].Monotonic, got[1].Monotonic)
+	}
 	q := got[1]
 	if q.Type != "Gauge" || q.Unit != "{item}" || q.Series != 2 || !slices.Contains(q.AttributeKeys, "queue") {
 		t.Errorf("queue.size = %+v", q)
