@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/mtk14n/obsrv/internal/api"
+	"github.com/mtk14n/obsrv/internal/compact"
 	"github.com/mtk14n/obsrv/internal/ingest"
 	objfs "github.com/mtk14n/obsrv/internal/objstore/fs"
 	"github.com/mtk14n/obsrv/internal/otlp"
@@ -49,6 +50,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 		otlpHTTPAddr = fs.String("otlp-http-addr", ":4318", "listen address for OTLP/HTTP")
 		httpAddr     = fs.String("http-addr", ":8080", "listen address for the API and UI")
 		dataDir      = fs.String("data-dir", "./data", "directory for the WAL and the local object store")
+		retention    = fs.Duration("retention", 7*24*time.Hour, "how long to keep telemetry (0 keeps it forever)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -83,6 +85,8 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return sink.Run(ctx) })
+	compactor := compact.New(compact.Options{Store: store, Retention: *retention, Logger: log})
+	g.Go(func() error { compactor.Run(ctx, time.Minute); return nil })
 	grpcSrv := grpc.NewServer(grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes))
 	otlp.RegisterGRPC(grpcSrv, sink)
 	serveGRPC(ctx, g, log, *otlpGRPCAddr, grpcSrv)
