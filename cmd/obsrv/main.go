@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/mtk14n/obsrv/internal/ingest"
+	objfs "github.com/mtk14n/obsrv/internal/objstore/fs"
 	"github.com/mtk14n/obsrv/internal/otlp"
 	"github.com/mtk14n/obsrv/internal/version"
 )
@@ -43,6 +45,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 		otlpGRPCAddr = fs.String("otlp-grpc-addr", ":4317", "listen address for OTLP/gRPC")
 		otlpHTTPAddr = fs.String("otlp-http-addr", ":4318", "listen address for OTLP/HTTP")
 		httpAddr     = fs.String("http-addr", ":8080", "listen address for the API and UI")
+		dataDir      = fs.String("data-dir", "./data", "directory for the WAL and the local object store")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -55,8 +58,22 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	log := slog.New(slog.NewTextHandler(out, nil))
 	log.Info("starting", "version", version.Version, "commit", version.Commit)
 
-	sink := &ingest.Counter{}
+	store, err := objfs.New(filepath.Join(*dataDir, "store"))
+	if err != nil {
+		return err
+	}
+	sink, err := ingest.New(ingest.Options{
+		WALDir: filepath.Join(*dataDir, "wal"),
+		Store:  store,
+		Logger: log,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = sink.Close() }()
+
 	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error { return sink.Run(ctx) })
 	grpcSrv := grpc.NewServer(grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes))
 	otlp.RegisterGRPC(grpcSrv, sink)
 	serveGRPC(ctx, g, log, *otlpGRPCAddr, grpcSrv)
@@ -125,7 +142,7 @@ func newAPIHandler() http.Handler {
 }
 
 // reportStats logs ingestion totals every 10 seconds while they change.
-func reportStats(ctx context.Context, log *slog.Logger, c *ingest.Counter) {
+func reportStats(ctx context.Context, log *slog.Logger, c *ingest.Pipeline) {
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	var last ingest.Stats

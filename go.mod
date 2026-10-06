@@ -3,6 +3,7 @@ module github.com/mtk14n/obsrv
 go 1.27
 
 require (
+	github.com/oklog/ulid/v2 v2.1.2
 	github.com/parquet-go/parquet-go v0.32.0
 	go.opentelemetry.io/collector/pdata v1.68.0
 	golang.org/x/sync v0.23.0
