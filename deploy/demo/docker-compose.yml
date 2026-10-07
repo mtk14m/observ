@@ -47,5 +47,23 @@ services:
       <<: *shop-env
       DEMO_ROLE: payment
 
+  # Receives alert webhooks and prints them: docker compose logs -f webhook
+  webhook:
+    image: mendhak/http-https-echo:latest
+    environment:
+      HTTP_PORT: "8080"
+      LOG_IGNORE_PATH: /healthz
+
+  # Creates a notification channel and a few alert rules on first start.
+  alerts:
+    image: curlimages/curl:latest
+    depends_on:
+      obsrv:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/sh", "/seed-alerts.sh"]
+    volumes:
+      - ./seed-alerts.sh:/seed-alerts.sh:ro
+
 volumes:
   obsrv-data:
