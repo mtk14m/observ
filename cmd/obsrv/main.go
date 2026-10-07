@@ -87,11 +87,14 @@ func start(ctx context.Context, args []string, out io.Writer) error {
 	}
 	defer func() { _ = engine.Close() }()
 
-	db, err := metadata.Open(ctx, filepath.Join(cfg.dataDir, "obsrv.db"), alert.Migrations)
+	db, err := metadata.Open(ctx, filepath.Join(cfg.dataDir, "obsrv.db"))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
+	if err := metadata.Migrate(ctx, db, "alert", alert.Migrations); err != nil {
+		return err
+	}
 	alerts := alert.NewStore(db)
 	sender := notify.New(notify.Options{BaseURL: cfg.publicURL})
 	evaluator := alert.NewEvaluator(alert.EvaluatorOptions{Store: alerts, Source: engine, Sender: sender, Logger: log})

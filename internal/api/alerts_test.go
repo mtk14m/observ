@@ -36,7 +36,10 @@ type alertsEnv struct {
 
 func newAlertsEnv(t *testing.T) alertsEnv {
 	t.Helper()
-	db, err := metadata.Open(t.Context(), filepath.Join(t.TempDir(), "obsrv.db"), alert.Migrations)
+	db, err := metadata.Open(t.Context(), filepath.Join(t.TempDir(), "obsrv.db"))
+	if err == nil {
+		err = metadata.Migrate(t.Context(), db, "alert", alert.Migrations)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
