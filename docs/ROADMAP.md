@@ -19,7 +19,11 @@ serveur en mémoire à chaque `go test`, contre MinIO en CI et en conditions ré
 
 Reste à faire pour terminer les phases 0 et 1 : les rollups de métriques, la table de resources
 dédupliquées, la décision sur les IDs binaires, la mesure sur la démo OpenTelemetry officielle et
-la comparaison avec OpenObserve et SigNoz. Ensuite (phase 2) : alerting et authentification.
+la comparaison avec OpenObserve et SigNoz.
+
+L'alerting de la phase 2 est en place : règles sur des comptages de logs ou des métriques, par
+groupe, avec délai de confirmation, notifications Slack et webhook, page Alertes. Reste pour la
+phase 2 : l'authentification, les dashboards et la mesure auprès d'équipes pilotes.
 
 ## Phase 0 — Valider les choix risqués (3–4 semaines)
 

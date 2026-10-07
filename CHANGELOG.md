@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Past 30 minutes" time range preset and a favicon for the web UI.
 - S3-compatible storage (`-storage=s3`) with a local query cache, and a MinIO demo (`make demo-s3`).
 - Every flag can be set with an `OBSRV_*` environment variable.
+- Alerting: rules on log counts or metrics (optionally per group), with a waiting period, evaluated
+  every `-alert-interval`; notifications to Slack and webhooks; an alerts page with live preview,
+  channels and event history. Metadata is stored in an embedded SQLite database.
 
 ### Changed
 

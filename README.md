@@ -44,6 +44,7 @@
   (`service:api level:error "timeout"`). You don't need PromQL or a query language to learn.
 - **Correlated.** Go from a service to its slow requests, from a trace to its logs, from an error to
   the call that caused it, in a click.
+- **Alerting included.** Alert on log counts or metrics, and get notified on Slack or any webhook.
 - **No lock-in.** Telemetry is stored as Apache Parquet with a [public schema](pkg/schema/schema.go),
   on your disk or in your own S3 bucket. Any tool can read it, even when obsrv is not running, and a
   test in CI guarantees it.
@@ -69,6 +70,13 @@ Search with a short syntax, see the volume by severity, and open any line to see
 
 ![The logs page with a volume histogram by severity and a list of log records](docs/images/logs.png)
 
+### Get alerted
+
+Alert on a log count or a metric, per service if you want, and get notified on Slack or any
+webhook. A preview shows the current value before you save a rule.
+
+![The alerts page with firing and healthy rules, recent events and notification channels](docs/images/alerts.png)
+
 ### Explore metrics without a query language
 
 Pick a metric, an aggregation and a grouping. Counters become rates and histograms give percentiles.
@@ -91,7 +99,9 @@ Open <http://localhost:8080>. Data appears within seconds. Things to try:
 2. **Traces**: tick *Errors only* and open a trace. The payment call failed, and its logs are under the waterfall.
 3. **Logs**: search `level:error`, or `service:payment "refused"`. Click a line, then *View trace*.
 4. **Metrics**: pick `http.server.request.duration` and show the `p95` by `service.name`.
-5. **Leave whenever you want**: the data is plain Parquet. You can query it with DuckDB, without obsrv:
+5. **Alerts**: the demo comes with three rules. *Payment refusals* fires within a minute or two.
+   Watch the notifications arrive with `docker compose -f deploy/demo/docker-compose.yml logs -f webhook`.
+6. **Leave whenever you want**: the data is plain Parquet. You can query it with DuckDB, without obsrv:
 
    ```sh
    docker compose -f deploy/demo/docker-compose.yml cp obsrv:/data/store ./obsrv-data
@@ -114,7 +124,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # OTLP/HTTP, or :4317 for OT
 | 4318 | OTLP/HTTP (protobuf and JSON) |
 | 8080 | Web UI and `/api/v1` |
 
-Useful flags: `-data-dir` (default `./data`) and `-retention` (default `168h`). Every flag can also
+Useful flags: `-data-dir` (default `./data`), `-retention` (default `168h`) and `-public-url`
+(used for links in alert notifications). Every flag can also
 be set with an environment variable: `-retention` is `OBSRV_RETENTION`. Run `obsrv -help` for the full list.
 
 ## Keep your data in your own bucket
@@ -142,7 +153,9 @@ flowchart LR
         parquet --> compactor["Compaction<br/>and retention"]
         parquet --> duckdb["Embedded DuckDB"]
         duckdb --> ui["JSON API and web UI"]
+        duckdb --> alerts["Alert evaluator"]
     end
+    alerts -- "notifications" --> chat["Slack · webhooks"]
     parquet -. "open format" .-> tools["DuckDB · Spark · Snowflake · …"]
 ```
 
