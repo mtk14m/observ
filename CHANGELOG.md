@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Free-text log search also matches attribute values.
 - Benchmark harness (`make bench`) and first results in `bench/RESULTS.md`.
 - "Past 30 minutes" time range preset and a favicon for the web UI.
+- S3-compatible storage (`-storage=s3`) with a local query cache, and a MinIO demo (`make demo-s3`).
+- Every flag can be set with an `OBSRV_*` environment variable.
 
 ### Changed
 

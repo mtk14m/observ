@@ -14,9 +14,12 @@ Premiers benchmarks (`bench/RESULTS.md`) : ingestion très au-delà de la cible,
 sur une heure de données. Compression : métriques 40× et traces 10× (cibles atteintes), logs 4,6×
 (cible 10× non atteinte, analyse et pistes dans le fichier).
 
-Reste à faire pour terminer les phases 0 et 1 : le stockage S3, les rollups de métriques, la
-table de resources dédupliquées, la décision sur les IDs binaires, la mesure sur la démo
-OpenTelemetry officielle et la comparaison avec OpenObserve et SigNoz.
+Le stockage S3 est en place (`-storage=s3`, cache local pour les requêtes), testé contre un faux
+serveur en mémoire à chaque `go test`, contre MinIO en CI et en conditions réelles (`make demo-s3`).
+
+Reste à faire pour terminer les phases 0 et 1 : les rollups de métriques, la table de resources
+dédupliquées, la décision sur les IDs binaires, la mesure sur la démo OpenTelemetry officielle et
+la comparaison avec OpenObserve et SigNoz. Ensuite (phase 2) : alerting et authentification.
 
 ## Phase 0 — Valider les choix risqués (3–4 semaines)
 

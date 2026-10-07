@@ -45,7 +45,8 @@
 - **Correlated.** Go from a service to its slow requests, from a trace to its logs, from an error to
   the call that caused it, in a click.
 - **No lock-in.** Telemetry is stored as Apache Parquet with a [public schema](pkg/schema/schema.go),
-  on your disk. Any tool can read it, even when obsrv is not running, and a test in CI guarantees it.
+  on your disk or in your own S3 bucket. Any tool can read it, even when obsrv is not running, and a
+  test in CI guarantees it.
 
 ## A quick tour
 
@@ -113,7 +114,23 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # OTLP/HTTP, or :4317 for OT
 | 4318 | OTLP/HTTP (protobuf and JSON) |
 | 8080 | Web UI and `/api/v1` |
 
-Useful flags: `-data-dir` (default `./data`) and `-retention` (default `168h`).
+Useful flags: `-data-dir` (default `./data`) and `-retention` (default `168h`). Every flag can also
+be set with an environment variable: `-retention` is `OBSRV_RETENTION`. Run `obsrv -help` for the full list.
+
+## Keep your data in your own bucket
+
+obsrv can store telemetry in any S3-compatible bucket, such as AWS S3, MinIO, Cloudflare R2,
+Scaleway or OVHcloud, instead of the local disk. Queries go through a local disk cache.
+
+```sh
+AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… obsrv \
+  -storage s3 -s3-endpoint s3.eu-west-3.amazonaws.com -s3-region eu-west-3 \
+  -s3-bucket my-telemetry -s3-prefix obsrv
+```
+
+Credentials come from the environment, `~/.aws/credentials` or the machine's IAM role. To try it
+locally with MinIO, run `make demo-s3` and open the MinIO console at <http://localhost:9001>
+(`minioadmin` / `minioadmin`) to browse the Parquet files.
 
 ## How it works
 
