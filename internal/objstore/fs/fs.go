@@ -176,3 +176,12 @@ func (s *Store) path(key string) string {
 func (s *Store) LocalPath(key string) string {
 	return s.path(key)
 }
+
+// Local implements the query engine's file source: objects are already
+// local files.
+func (s *Store) Local(_ context.Context, key string) (string, error) {
+	if err := objstore.ValidateKey(key); err != nil {
+		return "", err
+	}
+	return s.path(key), nil
+}

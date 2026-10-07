@@ -4,11 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2" // registers the "duckdb" driver
+	"golang.org/x/sync/errgroup"
 
 	"github.com/mtk14n/obsrv/internal/layout"
 	"github.com/mtk14n/obsrv/internal/objstore"
@@ -25,11 +28,15 @@ const (
 	counterLookback = 15 * time.Minute
 )
 
-// FileSource lists stored objects and resolves them to local files.
+// FileSource lists stored objects and resolves them to local files, for
+// example the filesystem store, or a cache in front of S3.
 type FileSource interface {
 	List(ctx context.Context, prefix string) ([]objstore.ObjectInfo, error)
-	LocalPath(key string) string
+	Local(ctx context.Context, key string) (string, error)
 }
+
+// fetchConcurrency bounds parallel downloads when resolving files.
+const fetchConcurrency = 8
 
 // TimeRange is a half-open interval [From, To). A zero range means "all".
 type TimeRange struct {
@@ -81,7 +88,7 @@ func (e *Engine) files(ctx context.Context, dir string, r TimeRange) ([]string, 
 	if err != nil {
 		return nil, fmt.Errorf("query: list %s: %w", dir, err)
 	}
-	var paths []string
+	var keys []string
 	for _, info := range infos {
 		k, ok := layout.ParseKey(info.Key)
 		if !ok {
@@ -90,8 +97,25 @@ func (e *Engine) files(ctx context.Context, dir string, r TimeRange) ([]string, 
 		if !r.From.IsZero() && (!k.Hour.Add(time.Hour).After(r.From) || !k.Hour.Before(r.To)) {
 			continue
 		}
-		paths = append(paths, e.src.LocalPath(info.Key))
+		keys = append(keys, info.Key)
 	}
+	paths := make([]string, len(keys))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(fetchConcurrency)
+	for i, key := range keys {
+		g.Go(func() error {
+			p, err := e.src.Local(gctx, key)
+			if errors.Is(err, objstore.ErrNotFound) {
+				return nil // removed by compaction since the listing
+			}
+			paths[i] = p
+			return err
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("query: fetch %s: %w", dir, err)
+	}
+	paths = slices.DeleteFunc(paths, func(p string) bool { return p == "" })
 	if e.hot != nil {
 		hot, err := e.hot.HotFiles(dir)
 		if err != nil {

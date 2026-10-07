@@ -44,7 +44,7 @@ type Store struct {
 var _ objstore.ObjectStore = (*Store)(nil)
 
 // New connects to the bucket and checks that it exists.
-func New(cfg Config) (*Store, error) {
+func New(ctx context.Context, cfg Config) (*Store, error) {
 	creds := credentials.NewChainCredentials([]credentials.Provider{
 		&credentials.EnvAWS{}, &credentials.EnvMinio{}, &credentials.FileAWSCredentials{}, &credentials.IAM{},
 	})
@@ -55,7 +55,7 @@ func New(cfg Config) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("objstore/s3: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	ok, err := client.BucketExists(ctx, cfg.Bucket)
 	if err != nil {

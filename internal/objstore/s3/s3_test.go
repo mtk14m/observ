@@ -49,7 +49,7 @@ var seq atomic.Int64
 
 func TestConformance(t *testing.T) {
 	objstoretest.Run(t, func(t *testing.T) objstore.ObjectStore {
-		s, err := s3.New(fakeS3(t, "obsrv"))
+		s, err := s3.New(t.Context(), fakeS3(t, "obsrv"))
 		if err != nil {
 			t.Fatalf("s3.New: %v", err)
 		}
@@ -68,7 +68,7 @@ func TestConformanceAgainstRealS3(t *testing.T) {
 		t.Skip("OBSRV_TEST_S3_ENDPOINT is not set")
 	}
 	objstoretest.Run(t, func(t *testing.T) objstore.ObjectStore {
-		s, err := s3.New(s3.Config{
+		s, err := s3.New(t.Context(), s3.Config{
 			Endpoint:  endpoint,
 			Bucket:    os.Getenv("OBSRV_TEST_S3_BUCKET"),
 			Prefix:    fmt.Sprintf("conformance-%d-%d", os.Getpid(), seq.Add(1)),
@@ -85,12 +85,12 @@ func TestConformanceAgainstRealS3(t *testing.T) {
 
 func TestPrefixIsolatesObjects(t *testing.T) {
 	cfg := fakeS3(t, "shared")
-	raw, err := s3.New(cfg)
+	raw, err := s3.New(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg.Prefix = "team-a/obsrv"
-	scoped, err := s3.New(cfg)
+	scoped, err := s3.New(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestPrefixIsolatesObjects(t *testing.T) {
 func TestNewFailsForMissingBucket(t *testing.T) {
 	cfg := fakeS3(t, "exists")
 	cfg.Bucket = "missing"
-	if _, err := s3.New(cfg); err == nil {
+	if _, err := s3.New(t.Context(), cfg); err == nil {
 		t.Error("New with a missing bucket returned nil error")
 	}
 }

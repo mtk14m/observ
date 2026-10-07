@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -22,7 +21,10 @@ import (
 	"github.com/mtk14n/obsrv/internal/api"
 	"github.com/mtk14n/obsrv/internal/compact"
 	"github.com/mtk14n/obsrv/internal/ingest"
+	"github.com/mtk14n/obsrv/internal/objstore"
+	"github.com/mtk14n/obsrv/internal/objstore/cache"
 	objfs "github.com/mtk14n/obsrv/internal/objstore/fs"
+	"github.com/mtk14n/obsrv/internal/objstore/s3"
 	"github.com/mtk14n/obsrv/internal/otlp"
 	"github.com/mtk14n/obsrv/internal/query"
 	"github.com/mtk14n/obsrv/internal/ui"
@@ -42,33 +44,24 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, out io.Writer) error {
-	fs := flag.NewFlagSet("obsrv", flag.ContinueOnError)
-	fs.SetOutput(out)
-	var (
-		showVersion  = fs.Bool("version", false, "print version and exit")
-		otlpGRPCAddr = fs.String("otlp-grpc-addr", ":4317", "listen address for OTLP/gRPC")
-		otlpHTTPAddr = fs.String("otlp-http-addr", ":4318", "listen address for OTLP/HTTP")
-		httpAddr     = fs.String("http-addr", ":8080", "listen address for the API and UI")
-		dataDir      = fs.String("data-dir", "./data", "directory for the WAL and the local object store")
-		retention    = fs.Duration("retention", 7*24*time.Hour, "how long to keep telemetry (0 keeps it forever)")
-	)
-	if err := fs.Parse(args); err != nil {
+	cfg, err := parseConfig(args, os.Getenv, out)
+	if err != nil {
 		return err
 	}
-	if *showVersion {
+	if cfg.showVersion {
 		_, err := fmt.Fprintln(out, version.String())
 		return err
 	}
 
 	log := slog.New(slog.NewTextHandler(out, nil))
-	log.Info("starting", "version", version.Version, "commit", version.Commit)
+	log.Info("starting", "version", version.Version, "commit", version.Commit, "storage", cfg.storage)
 
-	store, err := objfs.New(filepath.Join(*dataDir, "store"))
+	store, files, err := openStorage(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	sink, err := ingest.New(ingest.Options{
-		WALDir: filepath.Join(*dataDir, "wal"),
+		WALDir: filepath.Join(cfg.dataDir, "wal"),
 		Store:  store,
 		Logger: log,
 	})
@@ -77,7 +70,7 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	}
 	defer func() { _ = sink.Close() }()
 
-	engine, err := query.New(store, query.WithHot(sink))
+	engine, err := query.New(files, query.WithHot(sink))
 	if err != nil {
 		return err
 	}
@@ -85,15 +78,41 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return sink.Run(ctx) })
-	compactor := compact.New(compact.Options{Store: store, Retention: *retention, Logger: log})
+	compactor := compact.New(compact.Options{Store: store, Retention: cfg.retention, Logger: log})
 	g.Go(func() error { compactor.Run(ctx, time.Minute); return nil })
 	grpcSrv := grpc.NewServer(grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes))
 	otlp.RegisterGRPC(grpcSrv, sink)
-	serveGRPC(ctx, g, log, *otlpGRPCAddr, grpcSrv)
-	serve(ctx, g, log, "otlp-http", *otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{}))
-	serve(ctx, g, log, "http", *httpAddr, newAPIHandler(engine))
+	serveGRPC(ctx, g, log, cfg.otlpGRPCAddr, grpcSrv)
+	serve(ctx, g, log, "otlp-http", cfg.otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{}))
+	serve(ctx, g, log, "http", cfg.httpAddr, newAPIHandler(engine))
 	g.Go(func() error { reportStats(ctx, log, sink); return nil })
 	return g.Wait()
+}
+
+// openStorage returns the object store telemetry is written to, and the
+// file source the query engine reads from: the local store itself, or a
+// disk cache in front of S3.
+func openStorage(ctx context.Context, cfg config) (objstore.ObjectStore, query.FileSource, error) {
+	if cfg.storage == "s3" {
+		store, err := s3.New(ctx, cfg.s3)
+		if err != nil {
+			return nil, nil, err
+		}
+		files, err := cache.New(cache.Options{
+			Store:    store,
+			Dir:      filepath.Join(cfg.dataDir, "cache"),
+			MaxBytes: int64(cfg.cacheSizeMB) << 20,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return store, files, nil
+	}
+	store, err := objfs.New(filepath.Join(cfg.dataDir, "store"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return store, store, nil
 }
 
 // serve runs an HTTP server until ctx is done, then shuts it down gracefully.
