@@ -27,7 +27,7 @@ func TestUnknownFlagFails(t *testing.T) {
 }
 
 func TestHealthEndpoints(t *testing.T) {
-	srv := httptest.NewServer(newAPIHandler(nil))
+	srv := httptest.NewServer(newAPIHandler(nil, nil))
 	defer srv.Close()
 
 	for _, path := range []string{"/healthz", "/readyz", "/", "/logs"} {

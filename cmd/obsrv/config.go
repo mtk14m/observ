@@ -14,15 +14,17 @@ import (
 // config is obsrv's configuration. Every flag can also be set with an
 // environment variable: -s3-bucket is OBSRV_S3_BUCKET. Flags win.
 type config struct {
-	showVersion  bool
-	otlpGRPCAddr string
-	otlpHTTPAddr string
-	httpAddr     string
-	dataDir      string
-	retention    time.Duration
-	storage      string
-	s3           s3.Config
-	cacheSizeMB  int
+	showVersion   bool
+	otlpGRPCAddr  string
+	otlpHTTPAddr  string
+	httpAddr      string
+	dataDir       string
+	retention     time.Duration
+	storage       string
+	s3            s3.Config
+	cacheSizeMB   int
+	publicURL     string
+	alertInterval time.Duration
 }
 
 func parseConfig(args []string, getenv func(string) string, out io.Writer) (config, error) {
@@ -42,6 +44,8 @@ func parseConfig(args []string, getenv func(string) string, out io.Writer) (conf
 	fs.StringVar(&c.s3.Region, "s3-region", "", "S3 region")
 	fs.BoolVar(&c.s3.Insecure, "s3-insecure", false, "use plain HTTP to reach S3 (local MinIO)")
 	fs.IntVar(&c.cacheSizeMB, "cache-size-mb", 2048, "size of the local query cache with -storage=s3")
+	fs.StringVar(&c.publicURL, "public-url", "http://localhost:8080", "URL where users reach obsrv, used in alert notifications")
+	fs.DurationVar(&c.alertInterval, "alert-interval", 30*time.Second, "how often alert rules are evaluated")
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(out, "Usage: obsrv [flags]\n\nEvery flag can be set with an environment variable, e.g. -s3-bucket as OBSRV_S3_BUCKET.\nS3 credentials come from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, ~/.aws or an IAM role.\n\nFlags:")
 		fs.PrintDefaults()
@@ -76,6 +80,9 @@ func parseConfig(args []string, getenv func(string) string, out io.Writer) (conf
 		}
 	default:
 		return c, fmt.Errorf("unknown -storage %q: use fs or s3", c.storage)
+	}
+	if c.alertInterval < 5*time.Second {
+		return c, errors.New("-alert-interval must be at least 5s")
 	}
 	if c.cacheSizeMB < 0 {
 		return c, errors.New("-cache-size-mb must be positive")

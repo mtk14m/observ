@@ -14,7 +14,8 @@ func TestConfigDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.storage != "fs" || c.dataDir != "./data" || c.retention != 7*24*time.Hour ||
-		c.otlpGRPCAddr != ":4317" || c.otlpHTTPAddr != ":4318" || c.httpAddr != ":8080" {
+		c.otlpGRPCAddr != ":4317" || c.otlpHTTPAddr != ":4318" || c.httpAddr != ":8080" ||
+		c.publicURL != "http://localhost:8080" || c.alertInterval != 30*time.Second {
 		t.Errorf("defaults = %+v", c)
 	}
 }

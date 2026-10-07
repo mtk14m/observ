@@ -38,6 +38,8 @@ var _ Querier = (*query.Engine)(nil)
 // Options configures the handler.
 type Options struct {
 	Now func() time.Time
+	// Alerts enables the alerting endpoints when set.
+	Alerts *Alerts
 }
 
 // errBadRequest marks client errors (400).
@@ -59,6 +61,9 @@ func NewHandler(q Querier, opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/traces/{id}", h.trace)
 	mux.HandleFunc("GET /api/v1/metrics", h.metrics)
 	mux.HandleFunc("GET /api/v1/metrics/query", h.metricQuery)
+	if opts.Alerts != nil {
+		opts.Alerts.register(mux)
+	}
 	return mux
 }
 

@@ -18,9 +18,12 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 
+	"github.com/mtk14n/obsrv/internal/alert"
 	"github.com/mtk14n/obsrv/internal/api"
 	"github.com/mtk14n/obsrv/internal/compact"
 	"github.com/mtk14n/obsrv/internal/ingest"
+	"github.com/mtk14n/obsrv/internal/metadata"
+	"github.com/mtk14n/obsrv/internal/notify"
 	"github.com/mtk14n/obsrv/internal/objstore"
 	"github.com/mtk14n/obsrv/internal/objstore/cache"
 	objfs "github.com/mtk14n/obsrv/internal/objstore/fs"
@@ -44,6 +47,14 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, out io.Writer) error {
+	err := start(ctx, args, out)
+	if err != nil && ctx.Err() != nil {
+		return nil //nolint:nilerr // shutdown requested during startup: not a failure
+	}
+	return err
+}
+
+func start(ctx context.Context, args []string, out io.Writer) error {
 	cfg, err := parseConfig(args, os.Getenv, out)
 	if err != nil {
 		return err
@@ -76,6 +87,15 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	}
 	defer func() { _ = engine.Close() }()
 
+	db, err := metadata.Open(ctx, filepath.Join(cfg.dataDir, "obsrv.db"), alert.Migrations)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+	alerts := alert.NewStore(db)
+	sender := notify.New(notify.Options{BaseURL: cfg.publicURL})
+	evaluator := alert.NewEvaluator(alert.EvaluatorOptions{Store: alerts, Source: engine, Sender: sender, Logger: log})
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.Go(func() error { return sink.Run(ctx) })
 	compactor := compact.New(compact.Options{Store: store, Retention: cfg.retention, Logger: log})
@@ -84,7 +104,8 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	otlp.RegisterGRPC(grpcSrv, sink)
 	serveGRPC(ctx, g, log, cfg.otlpGRPCAddr, grpcSrv)
 	serve(ctx, g, log, "otlp-http", cfg.otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{}))
-	serve(ctx, g, log, "http", cfg.httpAddr, newAPIHandler(engine))
+	g.Go(func() error { evaluator.Run(ctx, cfg.alertInterval); return nil })
+	serve(ctx, g, log, "http", cfg.httpAddr, newAPIHandler(engine, &api.Alerts{Store: alerts, Previewer: evaluator, Sender: sender}))
 	g.Go(func() error { reportStats(ctx, log, sink); return nil })
 	return g.Wait()
 }
@@ -166,12 +187,12 @@ func serveGRPC(ctx context.Context, g *errgroup.Group, log *slog.Logger, addr st
 }
 
 // newAPIHandler serves health checks, the JSON API and the embedded UI.
-func newAPIHandler(q api.Querier) http.Handler {
+func newAPIHandler(q api.Querier, alerts *api.Alerts) http.Handler {
 	mux := http.NewServeMux()
 	ok := func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok\n") }
 	mux.HandleFunc("GET /healthz", ok)
 	mux.HandleFunc("GET /readyz", ok)
-	mux.Handle("/api/", api.NewHandler(q, api.Options{}))
+	mux.Handle("/api/", api.NewHandler(q, api.Options{Alerts: alerts}))
 	mux.Handle("/", ui.NewHandler(ui.Dist()))
 	return mux
 }
