@@ -70,11 +70,13 @@ func (s *Sender) Send(ctx context.Context, ch alert.Channel, rule alert.Rule, ev
 			Op: rule.Op, Threshold: rule.Threshold, WindowSeconds: rule.WindowSeconds, At: ev.At.UTC(), URL: link,
 		}
 	}
-	b, err := json.Marshal(body)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false) // keep "<" and ">" readable in receivers' logs
+	if err := enc.Encode(body); err != nil {
 		return fmt.Errorf("notify: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ch.URL, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ch.URL, &buf)
 	if err != nil {
 		return fmt.Errorf("notify: %w", err)
 	}

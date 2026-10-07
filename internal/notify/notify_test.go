@@ -40,6 +40,9 @@ func TestWebhookPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(string(*body), `"op":">"`) {
+		t.Errorf("operators must not be HTML-escaped: %s", *body)
+	}
 	var got map[string]any
 	if err := json.Unmarshal(*body, &got); err != nil {
 		t.Fatalf("invalid JSON %q: %v", *body, err)
