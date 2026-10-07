@@ -25,7 +25,14 @@ type config struct {
 	cacheSizeMB   int
 	publicURL     string
 	alertInterval time.Duration
+	ingestToken   string
+	adminEmail    string
+	adminPassword string
 }
+
+// secureCookies reports whether obsrv is served over HTTPS, in which case
+// the session cookie must only travel over HTTPS.
+func (c config) secureCookies() bool { return strings.HasPrefix(c.publicURL, "https://") }
 
 func parseConfig(args []string, getenv func(string) string, out io.Writer) (config, error) {
 	var c config
@@ -46,6 +53,9 @@ func parseConfig(args []string, getenv func(string) string, out io.Writer) (conf
 	fs.IntVar(&c.cacheSizeMB, "cache-size-mb", 2048, "size of the local query cache with -storage=s3")
 	fs.StringVar(&c.publicURL, "public-url", "http://localhost:8080", "URL where users reach obsrv, used in alert notifications")
 	fs.DurationVar(&c.alertInterval, "alert-interval", 30*time.Second, "how often alert rules are evaluated")
+	fs.StringVar(&c.ingestToken, "ingest-token", "", "require OTLP clients to send 'Authorization: Bearer <token>'")
+	fs.StringVar(&c.adminEmail, "admin-email", "", "create this admin account on first start (otherwise the UI asks)")
+	fs.StringVar(&c.adminPassword, "admin-password", "", "password of -admin-email")
 	fs.Usage = func() {
 		_, _ = fmt.Fprintln(out, "Usage: obsrv [flags]\n\nEvery flag can be set with an environment variable, e.g. -s3-bucket as OBSRV_S3_BUCKET.\nS3 credentials come from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, ~/.aws or an IAM role.\n\nFlags:")
 		fs.PrintDefaults()
@@ -80,6 +90,9 @@ func parseConfig(args []string, getenv func(string) string, out io.Writer) (conf
 		}
 	default:
 		return c, fmt.Errorf("unknown -storage %q: use fs or s3", c.storage)
+	}
+	if (c.adminEmail == "") != (c.adminPassword == "") {
+		return c, errors.New("-admin-email and -admin-password must be set together")
 	}
 	if c.alertInterval < 5*time.Second {
 		return c, errors.New("-alert-interval must be at least 5s")

@@ -20,6 +20,7 @@ import (
 
 	"github.com/mtk14n/obsrv/internal/alert"
 	"github.com/mtk14n/obsrv/internal/api"
+	"github.com/mtk14n/obsrv/internal/auth"
 	"github.com/mtk14n/obsrv/internal/compact"
 	"github.com/mtk14n/obsrv/internal/ingest"
 	"github.com/mtk14n/obsrv/internal/metadata"
@@ -95,6 +96,14 @@ func start(ctx context.Context, args []string, out io.Writer) error {
 	if err := metadata.Migrate(ctx, db, "alert", alert.Migrations); err != nil {
 		return err
 	}
+	if err := metadata.Migrate(ctx, db, "auth", auth.Migrations); err != nil {
+		return err
+	}
+	users := auth.NewStore(db, auth.StoreOptions{})
+	if err := bootstrapAdmin(ctx, log, users, cfg); err != nil {
+		return err
+	}
+	authHandler := auth.NewHandler(users, auth.HandlerOptions{SecureCookies: cfg.secureCookies()})
 	alerts := alert.NewStore(db)
 	sender := notify.New(notify.Options{BaseURL: cfg.publicURL})
 	evaluator := alert.NewEvaluator(alert.EvaluatorOptions{Store: alerts, Source: engine, Sender: sender, Logger: log})
@@ -103,14 +112,43 @@ func start(ctx context.Context, args []string, out io.Writer) error {
 	g.Go(func() error { return sink.Run(ctx) })
 	compactor := compact.New(compact.Options{Store: store, Retention: cfg.retention, Logger: log})
 	g.Go(func() error { compactor.Run(ctx, time.Minute); return nil })
-	grpcSrv := grpc.NewServer(grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes))
+	grpcOpts := []grpc.ServerOption{grpc.MaxRecvMsgSize(otlp.DefaultMaxBodyBytes)}
+	if cfg.ingestToken != "" {
+		grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(otlp.TokenInterceptor(cfg.ingestToken)))
+	} else {
+		log.Warn("OTLP ingestion is open to anyone who can reach it; set -ingest-token to require a token")
+	}
+	grpcSrv := grpc.NewServer(grpcOpts...)
 	otlp.RegisterGRPC(grpcSrv, sink)
 	serveGRPC(ctx, g, log, cfg.otlpGRPCAddr, grpcSrv)
-	serve(ctx, g, log, "otlp-http", cfg.otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{}))
+	serve(ctx, g, log, "otlp-http", cfg.otlpHTTPAddr, otlp.NewHTTPHandler(sink, otlp.HTTPOptions{Token: cfg.ingestToken}))
 	g.Go(func() error { evaluator.Run(ctx, cfg.alertInterval); return nil })
-	serve(ctx, g, log, "http", cfg.httpAddr, newAPIHandler(engine, &api.Alerts{Store: alerts, Previewer: evaluator, Sender: sender}))
+	serve(ctx, g, log, "http", cfg.httpAddr, newAPIHandler(engine, &api.Alerts{Store: alerts, Previewer: evaluator, Sender: sender}, authHandler))
 	g.Go(func() error { reportStats(ctx, log, sink); return nil })
 	return g.Wait()
+}
+
+// bootstrapAdmin creates the admin account from the configuration when no
+// account exists yet, for automated deployments.
+func bootstrapAdmin(ctx context.Context, log *slog.Logger, users *auth.Store, cfg config) error {
+	n, err := users.CountUsers(ctx)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	if cfg.adminEmail == "" {
+		log.Info("no account yet: open the UI to create the admin account")
+		return nil
+	}
+	if _, err := users.CreateUser(ctx, auth.NewUser{
+		Email: cfg.adminEmail, Name: "Admin", Password: cfg.adminPassword, Role: auth.RoleAdmin,
+	}); err != nil {
+		return fmt.Errorf("create admin account: %w", err)
+	}
+	log.Info("created the admin account", "email", cfg.adminEmail)
+	return nil
 }
 
 // openStorage returns the object store telemetry is written to, and the
@@ -189,13 +227,15 @@ func serveGRPC(ctx context.Context, g *errgroup.Group, log *slog.Logger, addr st
 	})
 }
 
-// newAPIHandler serves health checks, the JSON API and the embedded UI.
-func newAPIHandler(q api.Querier, alerts *api.Alerts) http.Handler {
+// newAPIHandler serves health checks, authentication, the JSON API (signed
+// in users only) and the embedded UI.
+func newAPIHandler(q api.Querier, alerts *api.Alerts, authHandler *auth.Handler) http.Handler {
 	mux := http.NewServeMux()
 	ok := func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok\n") }
 	mux.HandleFunc("GET /healthz", ok)
 	mux.HandleFunc("GET /readyz", ok)
-	mux.Handle("/api/", api.NewHandler(q, api.Options{Alerts: alerts}))
+	authHandler.Register(mux)
+	mux.Handle("/api/", authHandler.Require(api.NewHandler(q, api.Options{Alerts: alerts})))
 	mux.Handle("/", ui.NewHandler(ui.Dist()))
 	return mux
 }

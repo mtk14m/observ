@@ -35,6 +35,25 @@ func TestEnvironmentConfiguresUnsetFlags(t *testing.T) {
 	}
 }
 
+func TestAuthConfig(t *testing.T) {
+	c, err := parseConfig(nil, env(map[string]string{
+		"OBSRV_INGEST_TOKEN":   "tok",
+		"OBSRV_ADMIN_EMAIL":    "ada@example.com",
+		"OBSRV_ADMIN_PASSWORD": "correct horse battery",
+		"OBSRV_PUBLIC_URL":     "https://obsrv.example.com",
+	}), io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ingestToken != "tok" || c.adminEmail != "ada@example.com" || c.adminPassword != "correct horse battery" ||
+		!c.secureCookies() {
+		t.Errorf("config = %+v", c)
+	}
+	if _, err := parseConfig([]string{"-admin-email", "a@b.c"}, env(nil), io.Discard); err == nil {
+		t.Error("an admin email without a password must be rejected")
+	}
+}
+
 func TestConfigErrors(t *testing.T) {
 	cases := map[string]struct {
 		args []string

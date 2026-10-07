@@ -21,8 +21,13 @@ import (
 
 func dialGRPC(t *testing.T, sink otlp.Sink) *grpc.ClientConn {
 	t.Helper()
+	return dialGRPCWith(t, sink)
+}
+
+func dialGRPCWith(t *testing.T, sink otlp.Sink, opts ...grpc.ServerOption) *grpc.ClientConn {
+	t.Helper()
 	ln := bufconn.Listen(1 << 20)
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(opts...)
 	otlp.RegisterGRPC(srv, sink)
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(srv.Stop)

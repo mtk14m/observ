@@ -30,6 +30,8 @@ const (
 type HTTPOptions struct {
 	// MaxBodyBytes defaults to DefaultMaxBodyBytes when zero.
 	MaxBodyBytes int64
+	// Token, when set, must be sent as "Authorization: Bearer <token>".
+	Token string
 }
 
 // NewHTTPHandler returns an http.Handler implementing the OTLP/HTTP
@@ -38,7 +40,7 @@ func NewHTTPHandler(sink Sink, opts HTTPOptions) http.Handler {
 	if opts.MaxBodyBytes <= 0 {
 		opts.MaxBodyBytes = DefaultMaxBodyBytes
 	}
-	h := &httpHandler{maxBody: opts.MaxBodyBytes}
+	h := &httpHandler{maxBody: opts.MaxBodyBytes, token: opts.Token}
 	mux := http.NewServeMux()
 	mux.Handle("POST /v1/traces", h.endpoint(func(ctx context.Context, body []byte, json bool) (encoder, error) {
 		req := ptraceotlp.NewExportRequest()
@@ -95,10 +97,16 @@ type consumeFunc func(ctx context.Context, body []byte, json bool) (encoder, err
 
 type httpHandler struct {
 	maxBody int64
+	token   string
 }
 
 func (h *httpHandler) endpoint(consume consumeFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.token != "" && !validBearer(r.Header.Get("Authorization"), h.token) {
+			json, _ := isJSON(r.Header.Get("Content-Type"))
+			writeError(w, json, http.StatusUnauthorized, "missing or invalid ingest token")
+			return
+		}
 		json, ok := isJSON(r.Header.Get("Content-Type"))
 		if !ok {
 			writeError(w, false, http.StatusUnsupportedMediaType, "unsupported content type, use application/x-protobuf or application/json")
@@ -234,6 +242,8 @@ func grpcCode(status int) int {
 		return 8 // RESOURCE_EXHAUSTED
 	case http.StatusServiceUnavailable:
 		return 14 // UNAVAILABLE
+	case http.StatusUnauthorized:
+		return 16 // UNAUTHENTICATED
 	default:
 		return 13 // INTERNAL
 	}
