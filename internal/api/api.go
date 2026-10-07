@@ -27,6 +27,7 @@ type Querier interface {
 	ServiceMap(ctx context.Context, r query.TimeRange) ([]query.Edge, error)
 	SearchLogs(ctx context.Context, q query.LogQuery) ([]query.LogRecord, error)
 	LogHistogram(ctx context.Context, q query.LogQuery, step time.Duration) ([]query.HistogramBucket, error)
+	LogFacet(ctx context.Context, q query.LogQuery, key string, limit int) ([]query.FacetValue, error)
 	SearchTraces(ctx context.Context, q query.TraceQuery) ([]query.TraceSummary, error)
 	Trace(ctx context.Context, traceID string, r query.TimeRange) ([]query.Span, error)
 	Metrics(ctx context.Context, r query.TimeRange) ([]query.MetricInfo, error)
@@ -57,6 +58,7 @@ func NewHandler(q Querier, opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/service-map", h.serviceMap)
 	mux.HandleFunc("GET /api/v1/logs", h.logs)
 	mux.HandleFunc("GET /api/v1/logs/histogram", h.logHistogram)
+	mux.HandleFunc("GET /api/v1/logs/facets", h.logFacet)
 	mux.HandleFunc("GET /api/v1/traces", h.traces)
 	mux.HandleFunc("GET /api/v1/traces/{id}", h.trace)
 	mux.HandleFunc("GET /api/v1/metrics", h.metrics)
@@ -142,6 +144,21 @@ func (h *handler) logHistogram(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := h.q.LogHistogram(r.Context(), q, step)
+	write(w, data, err)
+}
+
+func (h *handler) logFacet(w http.ResponseWriter, r *http.Request) {
+	q, err := h.logQuery(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		writeError(w, fmt.Errorf("%w: key is required", errBadRequest))
+		return
+	}
+	data, err := h.q.LogFacet(r.Context(), query.LogQuery{TimeRange: q.TimeRange, Query: q.Query}, key, 20)
 	write(w, data, err)
 }
 

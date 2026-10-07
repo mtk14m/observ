@@ -46,6 +46,11 @@ func (f *fakeQuerier) SearchLogs(_ context.Context, q query.LogQuery) ([]query.L
 	return []query.LogRecord{{Body: "hello"}}, f.err
 }
 
+func (f *fakeQuerier) LogFacet(_ context.Context, q query.LogQuery, key string, limit int) ([]query.FacetValue, error) {
+	f.last = []any{q, key, limit}
+	return []query.FacetValue{{Value: "checkout", Count: 3}}, f.err
+}
+
 func (f *fakeQuerier) LogHistogram(_ context.Context, q query.LogQuery, step time.Duration) ([]query.HistogramBucket, error) {
 	f.last = []any{q, step}
 	return []query.HistogramBucket{}, f.err
@@ -244,5 +249,20 @@ func TestServiceMap(t *testing.T) {
 	}
 	if body["data"].([]any)[0].(map[string]any)["from"] != "a" {
 		t.Errorf("body = %v", body)
+	}
+}
+
+func TestLogFacet(t *testing.T) {
+	q := &fakeQuerier{}
+	code, body := get(t, q, "/api/v1/logs/facets?key=service.name&q=level:error")
+	want := []any{query.LogQuery{TimeRange: lastHour, Query: "level:error"}, "service.name", 20}
+	if code != http.StatusOK || !reflect.DeepEqual(q.last, want) {
+		t.Errorf("status %d, call %+v, want %+v", code, q.last, want)
+	}
+	if body["data"].([]any)[0].(map[string]any)["value"] != "checkout" {
+		t.Errorf("body = %v", body)
+	}
+	if code, _ := get(t, q, "/api/v1/logs/facets"); code != http.StatusBadRequest {
+		t.Errorf("missing key: %d, want 400", code)
 	}
 }

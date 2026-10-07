@@ -1,6 +1,7 @@
 package query
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -607,7 +608,7 @@ type GroupCount struct {
 }
 
 // CountLogs counts matching log records, per value of the groupBy
-// attributes (record or resource). Without groupBy it always returns one
+// attributes (record or resource; "level" is the severity). Without groupBy it always returns one
 // count, possibly zero.
 func (e *Engine) CountLogs(ctx context.Context, q LogQuery, groupBy []string) ([]GroupCount, error) {
 	pred, err := logsearch.Compile(q.Query)
@@ -625,6 +626,10 @@ func (e *Engine) CountLogs(ctx context.Context, q LogQuery, groupBy []string) ([
 	cols := make([]string, len(groupBy))
 	var args []any
 	for i, k := range groupBy {
+		if k == "level" {
+			cols[i] = "coalesce(nullif(upper(severity_text), ''), 'UNSET')"
+			continue
+		}
 		cols[i] = "coalesce(attributes[?], resource_attributes[?], '')"
 		args = append(args, k, k)
 	}
@@ -664,4 +669,32 @@ func (e *Engine) CountLogs(ctx context.Context, q LogQuery, groupBy []string) ([
 		return empty, rows.Err()
 	}
 	return out, rows.Err()
+}
+
+// FacetValue is one value of a log attribute and its number of records.
+type FacetValue struct {
+	Value string `json:"value"`
+	Count int64  `json:"count"`
+}
+
+// LogFacet returns the most frequent values of an attribute (or "level")
+// among matching log records, most frequent first.
+func (e *Engine) LogFacet(ctx context.Context, q LogQuery, key string, limit int) ([]FacetValue, error) {
+	counts, err := e.CountLogs(ctx, q, []string{key})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FacetValue, 0, len(counts))
+	for _, c := range counts {
+		if c.Count > 0 {
+			out = append(out, FacetValue{Value: c.Labels[key], Count: c.Count})
+		}
+	}
+	slices.SortFunc(out, func(a, b FacetValue) int {
+		return cmp.Or(cmp.Compare(b.Count, a.Count), strings.Compare(a.Value, b.Value))
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
