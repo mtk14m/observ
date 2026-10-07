@@ -247,6 +247,9 @@ export const api = {
   logs: (range: TimeRange, q: string, limit?: number) =>
     get<LogRecord[]>('/api/v1/logs', range, [['q', q], ['limit', limit]]),
 
+  logFacet: (range: TimeRange, q: string, key: string) =>
+    get<{ value: string; count: number }[]>('/api/v1/logs/facets', range, [['q', q], ['key', key]]),
+
   logHistogram: (range: TimeRange, q: string) =>
     get<HistogramBucket[]>('/api/v1/logs/histogram', range, [['q', q]]),
 

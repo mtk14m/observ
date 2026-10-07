@@ -7,6 +7,9 @@ export interface WaterfallRow {
   offset: number
   /** Duration relative to the trace, between 0 and 1. */
   width: number
+  hasChildren: boolean
+  /** Span IDs of the ancestors, root first. */
+  ancestors: string[]
 }
 
 const MIN_WIDTH = 0.002
@@ -32,15 +35,38 @@ export function buildWaterfall(spans: Span[]): WaterfallRow[] {
   const total = Math.max(end - start, 1)
 
   const rows: WaterfallRow[] = []
-  const visit = (s: Span, depth: number) => {
+  const visit = (s: Span, ancestors: string[]) => {
+    const kids = (children.get(s.span_id) ?? []).sort(byStart)
     rows.push({
       span: s,
-      depth,
+      depth: ancestors.length,
       offset: (s.start - start) / total,
       width: Math.max((s.end - s.start) / total, MIN_WIDTH),
+      hasChildren: kids.length > 0,
+      ancestors,
     })
-    for (const c of (children.get(s.span_id) ?? []).sort(byStart)) visit(c, depth + 1)
+    for (const c of kids) visit(c, [...ancestors, s.span_id])
   }
-  for (const r of roots.sort(byStart)) visit(r, 0)
+  for (const r of roots.sort(byStart)) visit(r, [])
   return rows
+}
+
+/**
+ * Filters waterfall rows: descendants of collapsed spans are hidden, and a
+ * search (on service and operation names) keeps matches and their ancestors.
+ */
+export function visibleRows(rows: WaterfallRow[], collapsed: Set<string>, search: string): WaterfallRow[] {
+  let out = rows.filter((r) => !r.ancestors.some((id) => collapsed.has(id)))
+  const needle = search.trim().toLowerCase()
+  if (needle) {
+    const keep = new Set<string>()
+    for (const r of out) {
+      if (`${r.span.service} ${r.span.name}`.toLowerCase().includes(needle)) {
+        keep.add(r.span.span_id)
+        r.ancestors.forEach((a) => keep.add(a))
+      }
+    }
+    out = out.filter((r) => keep.has(r.span.span_id))
+  }
+  return out
 }

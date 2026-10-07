@@ -1,117 +1,137 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { SECTIONS } from '@/sections'
+import { useTheme } from '@/composables/useTheme'
 import AppIcon from './AppIcon.vue'
 
 const route = useRoute()
-const expanded = ref(true)
+const { theme, toggle } = useTheme()
 
 // Navigation keeps the global time range, never page-specific filters.
 const timeQuery = computed(() => {
   const { from, to } = route.query
   return typeof from === 'string' && typeof to === 'string' ? { from, to } : {}
 })
+
+const groups = computed(() => {
+  const out: (typeof SECTIONS)[number][][] = []
+  for (const s of SECTIONS) (out[s.group] ??= []).push(s)
+  return out
+})
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed: !expanded }">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">◎</span>
-      <span class="label">obsrv</span>
-    </div>
+  <aside class="rail">
+    <RouterLink to="/" class="logo" aria-label="obsrv home">
+      <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
+        <g fill="none" stroke="var(--accent)" stroke-width="6">
+          <circle cx="32" cy="32" r="25" />
+          <circle cx="32" cy="32" r="12" />
+        </g>
+        <circle cx="32" cy="32" r="4" fill="var(--accent)" />
+      </svg>
+    </RouterLink>
 
-    <nav id="sidebar-nav" aria-label="Main">
-      <RouterLink
-        v-for="section in SECTIONS"
-        :key="section.path"
-        :to="{ path: section.path, query: timeQuery }"
-        :aria-label="section.name"
-        :title="expanded ? undefined : section.name"
-        class="item"
-      >
-        <AppIcon :name="section.icon" />
-        <span class="label">{{ section.name }}</span>
-      </RouterLink>
+    <nav aria-label="Main">
+      <div v-for="(group, i) in groups" :key="i" class="group">
+        <RouterLink
+          v-for="section in group"
+          :key="section.path"
+          :to="{ path: section.path, query: timeQuery }"
+          :aria-label="section.name"
+          :data-label="section.name"
+          class="item"
+          :class="{ active: route.path.startsWith(section.path) }"
+        >
+          <AppIcon :name="section.icon" :size="20" />
+        </RouterLink>
+      </div>
     </nav>
 
     <button
-      class="toggle item"
       type="button"
-      aria-controls="sidebar-nav"
-      :aria-expanded="expanded"
-      :aria-label="expanded ? 'Collapse sidebar' : 'Expand sidebar'"
-      @click="expanded = !expanded"
+      class="item theme"
+      :aria-label="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+      :data-label="theme === 'dark' ? 'Light theme' : 'Dark theme'"
+      @click="toggle"
     >
-      <AppIcon name="panel" />
-      <span class="label">Collapse</span>
+      <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
     </button>
   </aside>
 </template>
 
 <style scoped>
-.sidebar {
+.rail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  width: 200px;
-  padding: var(--space-2);
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
-  transition: width 120ms ease;
-}
-.sidebar.collapsed {
-  width: 52px;
-}
-.collapsed .label {
-  display: none;
-}
-.brand {
-  display: flex;
   align-items: center;
-  gap: var(--space-2);
-  height: 36px;
-  padding: 0 var(--space-2);
-  margin-bottom: var(--space-2);
-  font-weight: 650;
-  font-size: 15px;
-  letter-spacing: -0.01em;
+  width: var(--rail-width);
+  padding: var(--space-3) 0;
+  background: var(--bg-rail);
+  border-right: 1px solid var(--border);
 }
 .logo {
-  color: var(--accent);
-  font-size: 18px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-4);
 }
 nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   flex: 1;
+  gap: var(--space-5);
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  height: 32px;
-  padding: 0 var(--space-2);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
   border-radius: var(--radius);
+  background: none;
   color: var(--text-muted);
-  white-space: nowrap;
+  cursor: pointer;
 }
 .item:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
-.item[aria-current='page'] {
+.item.active {
   background: var(--accent-soft);
+  color: var(--accent-text);
+}
+/* Label tooltip on hover and keyboard focus. */
+.item::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 30;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
   color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition: opacity 100ms, transform 100ms;
 }
-.item[aria-current='page'] .icon {
-  color: var(--accent);
-}
-.toggle {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
+.item:hover::after,
+.item:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 </style>

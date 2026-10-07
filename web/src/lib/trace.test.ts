@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { buildWaterfall } from './trace'
+import { buildWaterfall, visibleRows } from './trace'
 import type { Span } from './api'
 
 function span(id: string, parent: string, start: number, end: number, service = 'svc'): Span {
@@ -32,5 +32,31 @@ describe('buildWaterfall', () => {
   test('gives zero-length traces a visible width', () => {
     const rows = buildWaterfall([span('a', '', 5, 5)])
     expect(rows[0]!.width).toBeGreaterThan(0)
+  })
+})
+
+describe('visibleRows', () => {
+  const rows = buildWaterfall([
+    span('root', '', 0, 100),
+    span('a', 'root', 10, 50),
+    span('a1', 'a', 20, 30),
+    span('b', 'root', 60, 100, 'payment'),
+  ])
+
+  test('rows know whether they have children', () => {
+    expect(rows.map((r) => [r.span.span_id, r.hasChildren])).toEqual([
+      ['root', true], ['a', true], ['a1', false], ['b', false],
+    ])
+  })
+
+  test('collapsing a span hides its descendants only', () => {
+    const ids = visibleRows(rows, new Set(['a']), '').map((r) => r.span.span_id)
+    expect(ids).toEqual(['root', 'a', 'b'])
+  })
+
+  test('search keeps matching spans and their ancestors', () => {
+    const ids = visibleRows(rows, new Set(), 'payment').map((r) => r.span.span_id)
+    expect(ids).toEqual(['root', 'b'])
+    expect(visibleRows(rows, new Set(), 'A1').map((r) => r.span.span_id)).toEqual(['root', 'a', 'a1'])
   })
 })

@@ -6,7 +6,7 @@ import LogsView from './LogsView.vue'
 
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
-  api: { logs: vi.fn(), logHistogram: vi.fn() },
+  api: { logs: vi.fn(), logHistogram: vi.fn(), logFacet: vi.fn() },
 }))
 
 const record: LogRecord = {
@@ -54,4 +54,36 @@ test('shows search syntax errors', async () => {
   const w = mount(LogsView, { global: { plugins: [router] } })
   await flushPromises()
   expect(w.find('[role="alert"]').text()).toContain('unterminated quote')
+})
+
+test('active filters are chips that can be removed', async () => {
+  const { w, router } = await render('/logs?q=service:payment%20level:error%20timeout')
+  const chips = w.findAll('.active-filter')
+  expect(chips.map((c) => c.text())).toEqual(['service is payment', 'level is error'])
+  await chips[1]!.find('button').trigger('click')
+  await flushPromises()
+  expect(router.currentRoute.value.query.q).toBe('service:payment timeout')
+})
+
+test('facets list values with counts and add a filter', async () => {
+  vi.mocked(api.logFacet).mockResolvedValue([{ value: 'checkout', count: 12 }, { value: 'payment', count: 5 }])
+  const { w, router } = await render('/logs?q=timeout')
+  await w.find('button.facet[data-key="service.name"]').trigger('click')
+  await flushPromises()
+  expect(api.logFacet).toHaveBeenLastCalledWith({ from: 'now-1h', to: 'now' }, 'timeout', 'service.name')
+  const options = w.findAll('.facet-menu [role="option"]')
+  expect(options.map((o) => o.text())).toEqual(['checkout12', 'payment5'])
+  await options[0]!.trigger('click')
+  await flushPromises()
+  expect(router.currentRoute.value.query.q).toBe('timeout service:checkout')
+})
+
+test('shows the number of matching logs and level pills', async () => {
+  vi.mocked(api.logHistogram).mockResolvedValue([{ t: 0, counts: { ERROR: 3, INFO: 4 } }])
+  const router = await makeRouter('/logs')
+  vi.mocked(api.logs).mockResolvedValue([record])
+  const w = mount(LogsView, { global: { plugins: [router] } })
+  await flushPromises()
+  expect(w.find('.tab.active').text()).toContain('7')
+  expect(w.find('tbody .pill.error').text()).toBe('Error')
 })

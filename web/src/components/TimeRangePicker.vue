@@ -50,7 +50,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
         :aria-selected="range.to === 'now' && range.from === preset.from"
         @click="choose(preset.from)"
       >
-        {{ preset.label }}
+        <span>{{ preset.label }}</span>
+        <span v-if="range.to === 'now' && range.from === preset.from" class="tick" aria-hidden="true">✓</span>
       </li>
     </ul>
   </div>
@@ -64,24 +65,28 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: 30px;
-  padding: 0 var(--space-2) 0 10px;
+  height: 36px;
+  padding: 0 10px 0 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
   color: var(--text);
   font: inherit;
+  font-weight: 500;
   cursor: pointer;
 }
 .trigger:hover {
   border-color: var(--border-strong);
 }
+.trigger .icon:first-child {
+  color: var(--text-muted);
+}
 .menu {
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   z-index: 10;
-  min-width: 180px;
+  min-width: 200px;
   margin: 0;
   padding: var(--space-1);
   list-style: none;
@@ -91,14 +96,19 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
   box-shadow: var(--shadow);
 }
 [role='option'] {
-  padding: 6px var(--space-2);
-  border-radius: calc(var(--radius) - 2px);
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 [role='option']:hover {
   background: var(--bg-hover);
 }
 [role='option'][aria-selected='true'] {
-  color: var(--accent);
+  font-weight: 600;
+}
+.tick {
+  color: var(--accent-text);
 }
 </style>

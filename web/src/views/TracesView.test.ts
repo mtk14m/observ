@@ -35,10 +35,26 @@ test('passes filters from the URL and links each trace', async () => {
 
 test('changing a filter updates the URL', async () => {
   const { w, router } = await render('/traces')
-  await w.find('input[type="checkbox"]').setValue(true)
+  const errorsOnly = w.find('button.errors-only')
+  expect(errorsOnly.attributes('aria-pressed')).toBe('false')
+  await errorsOnly.trigger('click')
   await flushPromises()
   expect(router.currentRoute.value.query.errors).toBe('true')
-  await w.find('select').setValue('frontend')
+
+  await w.find('button.facet[data-key="service"]').trigger('click')
+  await flushPromises()
+  await w.find('.facet-menu [role="option"]').trigger('click')
   await flushPromises()
   expect(router.currentRoute.value.query.service).toBe('frontend')
+  expect(w.find('.active-filter').text()).toContain('frontend')
+
+  await w.find('input[aria-label="Minimum duration in ms"]').setValue('250')
+  await w.find('input[aria-label="Minimum duration in ms"]').trigger('change')
+  await flushPromises()
+  expect(router.currentRoute.value.query.min_ms).toBe('250')
+})
+
+test('shows the number of traces', async () => {
+  const { w } = await render('/traces')
+  expect(w.find('.tab.active').text()).toContain('1')
 })

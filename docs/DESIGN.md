@@ -1,8 +1,9 @@
 # Design principles
 
-obsrv's interface is inspired by the best observability tools: the density and the
-"click on anything" exploration of Datadog, and the clean, calm look of Tsuga.
-We take inspiration from them and copy nothing: obsrv has its own identity.
+obsrv's interface is inspired by the best observability tools: the "click on anything"
+exploration of Datadog, and the calm, flat, search-first layout of Tsuga (icon rail, filter
+chips, tabs with counts, tree waterfalls). We take inspiration from them and copy no brand
+assets: obsrv keeps its own logo and accent color.
 
 ## Principles
 
@@ -23,29 +24,46 @@ We take inspiration from them and copy nothing: obsrv has its own identity.
 ## Layout
 
 ```
-┌────┬───────────────────────────────────────────────────────────┐
-│    │  search / breadcrumb                 [ Past 1 hour ▾ ]    │  top bar
-│ ◎  ├───────────┬───────────────────────────────────┬───────────┤
-│ ≡  │  facets   │  chart (volume / latency)         │  side     │
-│ ⌁  │  service  │───────────────────────────────────│  panel    │
-│ ▤  │  level    │  results list / table             │  (detail) │
-│ ⚠  │  env      │                                   │           │
-└────┴───────────┴───────────────────────────────────┴───────────┘
- nav
+┌────┬──────────────────────────────────────────────────────────────┐
+│ ◎  │ ▤ Logs explorer                          [ ◷ Past 1 hour ⌄ ] │  page header
+│    ├──────────────────────────────────────────────────────────────┤
+│ ⬡  │ [⌕ Search for attribute:value or text …          ] [Search] │
+│    │ [level is error ✕] [level ⌄] [service.name ⌄] [env ⌄] Clear  │  filter chips
+│ ≡  ├──────────────────────────────────────────────────────────────┤
+│ ▤  │ ▂▃▅▂▁▃▆▇▅▃  volume histogram                                 │
+│ ⌁  ├──────────────────────────────────────────────────────────────┤
+│    │ All logs (2.2K)                                              │  tabs with counts
+│ ▦  │ Time        Level    Service    Message                      │
+│ ⚠  │ 21:13:22    [Error]  payment    payment refused              │  side panel on click
+│    │                                                              │
+│ ☼  │                                                              │
+└────┴──────────────────────────────────────────────────────────────┘
+ icon rail
 ```
 
-The sidebar links to Services, Traces, Logs, Metrics, Dashboards and Alerts. It collapses to icons only.
+- **Icon rail.** A narrow rail of icons, grouped (services · signals · dashboards and alerts), with
+  labels as tooltips. The active section is tinted with the accent. The theme toggle sits at the bottom.
+- **Page header.** The section icon, a breadcrumb on detail pages (`Traces explorer / 5b4af9da`),
+  and the time range on the right, only on pages that use it.
+- **Search, then chips.** A large search field comes first. Active filters appear as removable
+  chips (`level is error ✕`), and facet chips list the most frequent values with their counts.
+- **Flat sections.** Areas are separated by hairlines rather than floating cards. Tabs carry
+  counts (`All logs 2.2K`).
 
 ## Visual language
 
 - **Theme:** dark is the default, because people on call look at it at 3 a.m. Light is also fully supported.
   Every color is a CSS custom property in `web/src/styles/tokens.css`. Components never use raw color values.
-- **Neutrals** carry 90% of the interface. A single accent (violet) marks interaction: focus, selection and primary actions.
+- **Neutrals** carry 90% of the interface. They are slightly warm grays, never blue-tinted. A
+  single accent (violet, obsrv's own color) marks interaction: focus, selection, active
+  navigation and primary actions. Changing the accent is a one-line token change.
+- **Level pills.** Log levels and statuses use tinted pills (`Error` in soft red, `Warn` in amber)
+  with a readable label, never color alone.
 - **Signal colors** are stable everywhere, so users learn them: logs, traces and metrics each have their own hue.
 - **Status colors** are reserved for meaning (ok, warning, error) and never used for decoration. Log levels follow a fixed scale.
 - **Type:** Inter for the UI and JetBrains Mono for data (IDs, attributes, log bodies, durations).
   Numbers use tabular figures so columns line up.
-- **Density:** 13px base text and 28px rows in tables, with an optional "comfortable" mode.
+- **Density:** 14px base text and 44px table rows. The interface is calm and roomy; the data is dense.
 
 ## Accessibility
 

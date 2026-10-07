@@ -17,7 +17,7 @@ describe('AppSidebar', () => {
 
   test('marks the current section', async () => {
     const wrapper = await render('/logs')
-    const current = wrapper.find('nav a[aria-current="page"]')
+    const current = wrapper.find('nav a.active')
     expect(current.attributes('aria-label')).toBe('Logs')
   })
 
@@ -27,12 +27,12 @@ describe('AppSidebar', () => {
     expect(traces.attributes('href')).toBe('/traces?from=now-7d&to=now')
   })
 
-  test('collapses to icons only', async () => {
+  test('groups sections and toggles the theme', async () => {
     const wrapper = await render('/')
-    const toggle = wrapper.find('button[aria-controls="sidebar-nav"]')
-    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.findAll('nav .group')).toHaveLength(3)
+    const toggle = wrapper.find('button.theme')
+    const before = toggle.attributes('aria-label')
     await toggle.trigger('click')
-    expect(toggle.attributes('aria-expanded')).toBe('false')
-    expect(wrapper.classes()).toContain('collapsed')
+    expect(toggle.attributes('aria-label')).not.toBe(before)
   })
 })

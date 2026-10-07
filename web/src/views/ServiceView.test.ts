@@ -32,7 +32,6 @@ async function render() {
 test('shows the key numbers, charts, operations and dependencies', async () => {
   const w = await render()
   expect(api.service).toHaveBeenCalledWith({ from: 'now-1h', to: 'now' }, 'checkout')
-  expect(w.find('h2').text()).toBe('checkout')
   expect(w.findAll('.tile').map((t) => t.text())).toEqual([
     expect.stringContaining('0.17/s'), expect.stringContaining('9%'), expect.stringContaining('860 ms'),
   ])

@@ -1,7 +1,8 @@
 /*
  * Design tokens. Components must use these variables, never raw colors.
- * Dark is the default theme; light applies via prefers-color-scheme or
- * [data-theme='light'].
+ *
+ * Dark is the default. Light applies when the OS prefers it (unless the
+ * user forced dark) or when the user forces it with [data-theme='light'].
  */
 :root {
   --font-sans: 'Inter Variable', system-ui, sans-serif;
@@ -11,31 +12,37 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
-  --radius: 6px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --rail-width: 56px;
 
-  /* Dark theme (default) */
-  --bg: #0e0f13;
-  --bg-sidebar: #0a0b0e;
-  --bg-elevated: #16181e;
-  --bg-hover: #1e2129;
-  --border: #23262f;
-  --border-strong: #343845;
-  --text: #e6e8ee;
-  --text-muted: #8b90a0;
+  /* Neutral, slightly warm grays: the interface recedes, the data speaks. */
+  --bg: #141517;
+  --bg-rail: #0f1011;
+  --bg-elevated: #1b1c1f;
+  --bg-subtle: #18191b;
+  --bg-hover: #212226;
+  --border: #26272b;
+  --border-strong: #35373c;
+  --text: #ececee;
+  --text-muted: #9b9ea6;
+  --text-faint: #6c6f77;
   --accent: #8b6cff;
-  --accent-soft: rgb(139 108 255 / 14%);
-  --shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  --accent-text: #b3a1ff;
+  --accent-soft: rgb(139 108 255 / 15%);
+  --shadow: 0 12px 32px rgb(0 0 0 / 50%);
+  --grid: #222327;
 
-  /* Signals: stable everywhere so users learn them. */
   --signal-logs: #4cb3ff;
   --signal-traces: #ffb547;
   --signal-metrics: #3fd39b;
 
-  /* Status: reserved for meaning, always paired with an icon or label. */
+  /* Status: reserved for meaning, always paired with an icon or a label. */
   --status-ok: #3fd39b;
-  --status-warn: #ffb547;
-  --status-error: #ff5c6c;
+  --status-warn: #f2b24b;
+  --status-error: #ff6370;
 
   /* Categorical series, fixed order (validated for color-vision deficiency). */
   --series-1: #3987e5;
@@ -47,11 +54,19 @@
   --series-7: #9085e9;
   --series-8: #e66767;
 
-  --grid: #1f2229;
-  --level-error: var(--status-error);
-  --level-warn: var(--status-warn);
+  /* Log levels: the bar color, and the tinted pill used in tables. */
+  --level-error: #e5535f;
+  --level-warn: #e0a23b;
   --level-info: #3987e5;
   --level-debug: #5b6070;
+  --pill-error-bg: rgb(229 83 95 / 18%);
+  --pill-error-text: #ff8a93;
+  --pill-warn-bg: rgb(224 162 59 / 16%);
+  --pill-warn-text: #f2be6b;
+  --pill-info-bg: rgb(57 135 229 / 16%);
+  --pill-info-text: #7fb3f2;
+  --pill-debug-bg: rgb(155 158 166 / 14%);
+  --pill-debug-text: #a9acb4;
 
   color-scheme: dark;
 }
@@ -59,21 +74,22 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
     --bg: #ffffff;
-    --bg-sidebar: #f6f7f9;
+    --bg-rail: #f6f6f7;
     --bg-elevated: #ffffff;
-    --bg-hover: #eef0f4;
-    --border: #e3e6ec;
-    --border-strong: #c9ced8;
-    --text: #15171c;
-    --text-muted: #5d6475;
+    --bg-subtle: #fafafa;
+    --bg-hover: #f1f1f3;
+    --border: #e6e6e9;
+    --border-strong: #d2d3d8;
+    --text: #141517;
+    --text-muted: #5f626b;
+    --text-faint: #8b8e96;
     --accent: #6b47f5;
+    --accent-text: #5a36e8;
     --accent-soft: rgb(107 71 245 / 10%);
-    --shadow: 0 8px 24px rgb(20 24 40 / 12%);
-    --signal-logs: #1a8fe0;
-    --signal-traces: #d98a00;
-    --signal-metrics: #13a571;
+    --shadow: 0 12px 32px rgb(20 24 40 / 12%);
+    --grid: #efeff2;
     --status-ok: #13a571;
-    --status-warn: #d98a00;
+    --status-warn: #c98500;
     --status-error: #e0303f;
     --series-1: #2a78d6;
     --series-2: #eb6834;
@@ -83,9 +99,61 @@
     --series-6: #008300;
     --series-7: #4a3aa7;
     --series-8: #e34948;
-    --grid: #eceef2;
+    --level-error: #d94452;
+    --level-warn: #d99a2b;
     --level-info: #2a78d6;
     --level-debug: #a3a8b5;
+    --pill-error-bg: #fde8ea;
+    --pill-error-text: #c42b39;
+    --pill-warn-bg: #fdf1dc;
+    --pill-warn-text: #a06a00;
+    --pill-info-bg: #e5effc;
+    --pill-info-text: #1f5fb0;
+    --pill-debug-bg: #f0f0f2;
+    --pill-debug-text: #5f626b;
     color-scheme: light;
   }
+}
+
+/* Same light values when the user forces the light theme. */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-rail: #f6f6f7;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #fafafa;
+  --bg-hover: #f1f1f3;
+  --border: #e6e6e9;
+  --border-strong: #d2d3d8;
+  --text: #141517;
+  --text-muted: #5f626b;
+  --text-faint: #8b8e96;
+  --accent: #6b47f5;
+  --accent-text: #5a36e8;
+  --accent-soft: rgb(107 71 245 / 10%);
+  --shadow: 0 12px 32px rgb(20 24 40 / 12%);
+  --grid: #efeff2;
+  --status-ok: #13a571;
+  --status-warn: #c98500;
+  --status-error: #e0303f;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --level-error: #d94452;
+  --level-warn: #d99a2b;
+  --level-info: #2a78d6;
+  --level-debug: #a3a8b5;
+  --pill-error-bg: #fde8ea;
+  --pill-error-text: #c42b39;
+  --pill-warn-bg: #fdf1dc;
+  --pill-warn-text: #a06a00;
+  --pill-info-bg: #e5effc;
+  --pill-info-text: #1f5fb0;
+  --pill-debug-bg: #f0f0f2;
+  --pill-debug-text: #5f626b;
+  color-scheme: light;
 }

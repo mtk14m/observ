@@ -36,13 +36,16 @@ async function render() {
 test('shows a summary, the waterfall and the logs of the trace', async () => {
   const w = await render()
   expect(api.trace).toHaveBeenCalledWith('t1')
-  expect(w.find('header').text()).toContain('200 ms')
-  expect(w.find('header').text()).toContain('2 spans')
+  const summary = w.find('.summary').text()
+  expect(summary).toContain('Max duration200 ms')
+  expect(summary).toContain('Total spans2')
+  expect(summary).toContain('Services2')
+  expect(summary).toContain('Errors1')
 
   const rows = w.findAll('.span-row')
   expect(rows).toHaveLength(2)
   expect(rows[1]!.classes()).toContain('error')
-  expect((rows[1]!.find('.name').element as HTMLElement).style.paddingLeft).toBe('16px')
+  expect((rows[1]!.find('.name').element as HTMLElement).style.paddingLeft).toBe('20px')
 
   const [query] = vi.mocked(api.logs).mock.calls[0]!.slice(1)
   expect(query).toBe('trace_id:t1')
@@ -56,4 +59,22 @@ test('clicking a span shows its attributes, status and events', async () => {
   expect(panel.text()).toContain('card declined')
   expect(panel.text()).toContain('CardDeclined')
   expect(panel.text()).toContain('http.route')
+})
+
+test('spans can be collapsed and searched', async () => {
+  const w = await render()
+  await w.findAll('.span-row')[0]!.find('button.toggle').trigger('click')
+  expect(w.findAll('.span-row')).toHaveLength(1)
+  await w.findAll('.span-row')[0]!.find('button.toggle').trigger('click')
+  expect(w.findAll('.span-row')).toHaveLength(2)
+
+  await w.find('input[aria-label="Search spans"]').setValue('frontend')
+  expect(w.findAll('.span-row')).toHaveLength(1)
+})
+
+test('links to the logs of the trace', async () => {
+  const w = await render()
+  const href = w.find('a.view-logs').attributes('href')!
+  expect(href).toContain('/logs?')
+  expect(decodeURIComponent(href)).toContain('q=trace_id:t1')
 })

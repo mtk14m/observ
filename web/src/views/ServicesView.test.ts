@@ -22,6 +22,7 @@ test('lists services with their RED metrics and links to their page', async () =
   const cells = w.findAll('tbody tr td').map((td) => td.text())
   expect(cells).toEqual(['payment', '120', '2/s', '8.3%', '80 ms', '191 ms', '900 ms'])
   expect(w.find('tbody a').attributes('href')).toBe('/services/payment?from=now-15m&to=now')
+  expect(w.find('.tab.active').text()).toContain('1')
 })
 
 test('explains how to send data when there is none', async () => {

@@ -25,12 +25,16 @@ const edges = useQuery(() => ({ ...range.value }), (r) => api.serviceMap(r))
     </StatusMessage>
 
     <template v-else-if="services.data.value">
+    <h2 v-if="edges.data.value?.length" class="section-title">Service map</h2>
     <ServiceMap
       v-if="edges.data.value?.length"
       :edges="edges.data.value"
       :services="services.data.value"
       :query="query"
     />
+    <div class="tabs">
+      <span class="tab active">All services <span class="count">{{ services.data.value.length }}</span></span>
+    </div>
     <table class="table">
       <thead>
         <tr>

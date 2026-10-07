@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { aggregations, seriesLabel, valueFormatter } from '@/lib/metrics'
 import TimeSeriesChart from '@/components/charts/TimeSeriesChart.vue'
 import StatusMessage from '@/components/StatusMessage.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,7 +63,10 @@ const format = computed(() => (current.value ? valueFormatter(current.value, agg
 <template>
   <div class="layout">
     <aside class="metric-list">
-      <input v-model="filter" class="input" type="search" placeholder="Filter metrics" aria-label="Filter metrics" />
+      <label class="search-field">
+        <AppIcon name="search" :size="16" />
+        <input v-model="filter" class="input" type="search" placeholder="Filter metrics" aria-label="Filter metrics" />
+      </label>
       <button
         v-for="m in visible"
         :key="m.name"
@@ -133,7 +137,9 @@ const format = computed(() => (current.value ? valueFormatter(current.value, agg
   border-right: 1px solid var(--border);
   overflow: auto;
 }
-.metric-list .input {
+.metric-list .search-field {
+  flex: none;
+  min-width: 0;
   margin-bottom: var(--space-2);
 }
 .metric-list button {

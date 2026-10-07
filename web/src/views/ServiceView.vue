@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { formatMs, formatPercent, formatRate } from '@/lib/format'
 import TimeSeriesChart from '@/components/charts/TimeSeriesChart.vue'
 import StatTile from '@/components/StatTile.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import StatusMessage from '@/components/StatusMessage.vue'
 
 const route = useRoute()
@@ -42,16 +43,10 @@ const logsLink = computed(() => ({ path: '/logs', query: { ...query.value, q: `s
 
 <template>
   <div class="page" :class="{ loading: detail.loading.value }">
-    <header class="head">
-      <div>
-        <RouterLink :to="{ path: '/services', query }" class="link back">← Services</RouterLink>
-        <h2>{{ name }}</h2>
-      </div>
-      <nav class="actions">
-        <RouterLink :to="tracesLink" class="btn">Traces</RouterLink>
-        <RouterLink :to="logsLink" class="btn">Logs</RouterLink>
-      </nav>
-    </header>
+    <nav class="actions">
+      <RouterLink :to="tracesLink" class="btn">View traces <AppIcon name="external" :size="14" /></RouterLink>
+      <RouterLink :to="logsLink" class="btn">View logs <AppIcon name="external" :size="14" /></RouterLink>
+    </nav>
 
     <StatusMessage v-if="detail.error.value" kind="error" title="Could not load the service" :detail="detail.error.value.message" />
 
@@ -123,27 +118,11 @@ const logsLink = computed(() => ({ path: '/logs', query: { ...query.value, q: `s
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-.back {
-  font-size: 12px;
-  color: var(--accent);
-}
-h2 {
-  margin: var(--space-1) 0 0;
-  font-size: 18px;
-}
 .actions {
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-2);
-}
-.actions .btn {
-  display: inline-flex;
-  align-items: center;
+  margin-bottom: var(--space-3);
 }
 .tiles {
   display: grid;
@@ -161,7 +140,7 @@ h2 {
 }
 h3 {
   margin: 0 0 var(--space-2);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 .bottom {
