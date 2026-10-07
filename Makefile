@@ -5,7 +5,7 @@ LDFLAGS   := -s -w \
 	-X github.com/mtk14n/obsrv/internal/version.Version=$(VERSION) \
 	-X github.com/mtk14n/obsrv/internal/version.Commit=$(COMMIT)
 
-.PHONY: all build build-go test test-go test-web lint lint-go lint-web fmt web-install web-dev web-build run bench demo demo-s3 demo-down clean
+.PHONY: all build build-go test test-go test-web lint lint-go lint-web fmt web-install web-dev web-build run bench demo demo-s3 demo-down screenshots clean
 
 all: lint test build
 
@@ -58,6 +58,9 @@ demo: ## Run obsrv with the demo shop in Docker, then open http://localhost:8080
 demo-s3: ## Run the demo with telemetry stored in a MinIO bucket
 	docker compose -f deploy/demo/docker-compose.yml -f deploy/demo/docker-compose.s3.yml up --build -d
 	@echo "obsrv: http://localhost:8080 · MinIO console: http://localhost:9001 (minioadmin/minioadmin)"
+
+screenshots: ## Regenerate the README screenshots from a running demo
+	./scripts/screenshots.sh
 
 demo-down: ## Stop the demo and delete its data
 	docker compose -f deploy/demo/docker-compose.yml -f deploy/demo/docker-compose.s3.yml down -v

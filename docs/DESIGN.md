@@ -16,7 +16,7 @@ assets: obsrv keeps its own logo and accent color.
    navigating away. Closing it brings you back to where you were.
 4. **The URL is the state.** Filters, time range and open panels are all in the URL, so every view can be shared as a link.
 5. **One global time range.** It is always visible in the top bar and shared by every page. Dragging across a chart zooms the time range.
-6. **Fast by default.** Results stream in, skeletons appear in under 100 ms, and charts use uPlot (canvas).
+6. **Fast by default.** Results load in the background while the previous ones stay visible, and charts are lightweight SVG (ADR 0005).
    No view should wait for the slowest query.
 7. **Keyboard first.** `/` focuses search, `t` opens the time picker, `Esc` closes the panel, `j`/`k` move through lists.
 8. **Works offline.** Fonts and assets are bundled. obsrv never calls a CDN, because it runs in air-gapped environments.
