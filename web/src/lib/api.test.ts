@@ -41,3 +41,23 @@ describe('api', () => {
     expect((err as ApiError).status).toBe(400)
   })
 })
+
+describe('write requests', () => {
+  test('send JSON and unwrap data', async () => {
+    const fetch = mockFetch(201, { data: { id: 'r1' } })
+    const rule = { name: 'x', kind: 'logs' as const, query: '', op: '>' as const, threshold: 1,
+      window_seconds: 300, for_seconds: 0, channels: [], enabled: true }
+    expect(await api.createRule(rule)).toEqual({ id: 'r1' })
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe('/api/v1/alerts/rules')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual(rule)
+  })
+
+  test('handle empty 204 responses and errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+    await expect(api.deleteRule('r1')).resolves.toBeUndefined()
+    mockFetch(409, { error: 'in use' })
+    await expect(api.deleteChannel('c1')).rejects.toMatchObject({ message: 'in use', status: 409 })
+  })
+})

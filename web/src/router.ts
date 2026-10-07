@@ -6,6 +6,7 @@ import LogsView from './views/LogsView.vue'
 import TracesView from './views/TracesView.vue'
 import TraceView from './views/TraceView.vue'
 import ServiceView from './views/ServiceView.vue'
+import AlertsView from './views/AlertsView.vue'
 import MetricsView from './views/MetricsView.vue'
 
 const views: Record<string, RouteRecordRaw['component']> = {
@@ -13,6 +14,7 @@ const views: Record<string, RouteRecordRaw['component']> = {
   '/traces': TracesView,
   '/logs': LogsView,
   '/metrics': MetricsView,
+  '/alerts': AlertsView,
 }
 
 export const routes: RouteRecordRaw[] = [

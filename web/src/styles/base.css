@@ -134,3 +134,15 @@ a {
 .btn:hover {
   border-color: var(--border-strong);
 }
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.btn.danger {
+  color: var(--status-error);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

@@ -15,5 +15,5 @@ export const SECTIONS: readonly Section[] = [
   { path: '/logs', name: 'Logs', icon: 'logs', hint: 'Send log records over OTLP to start searching logs.' },
   { path: '/metrics', name: 'Metrics', icon: 'metrics', hint: 'Send metrics over OTLP to start building charts.' },
   { path: '/dashboards', name: 'Dashboards', icon: 'dashboards', hint: 'Dashboards are coming soon. Explore metrics in the meantime.' },
-  { path: '/alerts', name: 'Alerts', icon: 'alerts', hint: 'Alerting is coming soon.' },
+  { path: '/alerts', name: 'Alerts', icon: 'alerts', hint: 'Get notified when errors spike or latency degrades.' },
 ]

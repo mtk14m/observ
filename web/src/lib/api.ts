@@ -51,6 +51,64 @@ export interface Edge {
   errors: number
 }
 
+export interface AlertRule {
+  id?: string
+  name: string
+  kind: 'logs' | 'metric'
+  metric?: string
+  agg?: string
+  filters?: Record<string, string>
+  query?: string
+  group_by?: string[]
+  op: '>' | '>=' | '<' | '<='
+  threshold: number
+  window_seconds: number
+  for_seconds: number
+  channels: string[]
+  enabled: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface AlertState {
+  rule_id: string
+  group: string
+  labels: Record<string, string>
+  status: 'ok' | 'pending' | 'firing'
+  since: string
+  value: number
+}
+
+export interface RuleStatus extends AlertRule {
+  id: string
+  status: 'ok' | 'pending' | 'firing'
+  firing: number
+  states: AlertState[]
+}
+
+export interface Channel {
+  id?: string
+  name: string
+  type: 'webhook' | 'slack'
+  url: string
+}
+
+export interface AlertEvent {
+  id: number
+  rule_id: string
+  rule_name: string
+  labels: Record<string, string>
+  status: 'firing' | 'resolved'
+  value: number
+  at: string
+}
+
+export interface PreviewValue {
+  labels: Record<string, string>
+  value: number
+  breached: boolean
+}
+
 export interface LogRecord {
   time: number
   service: string
@@ -166,6 +224,18 @@ async function get<T>(path: string, range: TimeRange | null, params: [string, Pa
   return body.data as T
 }
 
+async function send<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (res.status === 204) return undefined as T
+  const json = (await res.json().catch(() => ({}))) as { data?: T; error?: string }
+  if (!res.ok) throw new ApiError(json.error ?? res.statusText, res.status)
+  return json.data as T
+}
+
 export const api = {
   services: (range: TimeRange) => get<ServiceSummary[]>('/api/v1/services', range),
 
@@ -190,6 +260,17 @@ export const api = {
   trace: (id: string) => get<Span[]>(`/api/v1/traces/${encodeURIComponent(id)}`, null),
 
   metrics: (range: TimeRange) => get<MetricInfo[]>('/api/v1/metrics', range),
+
+  alertRules: () => get<RuleStatus[]>('/api/v1/alerts/rules', null),
+  createRule: (r: AlertRule) => send<AlertRule>('POST', '/api/v1/alerts/rules', r),
+  updateRule: (id: string, r: AlertRule) => send<AlertRule>('PUT', `/api/v1/alerts/rules/${encodeURIComponent(id)}`, r),
+  deleteRule: (id: string) => send<void>('DELETE', `/api/v1/alerts/rules/${encodeURIComponent(id)}`),
+  previewRule: (r: AlertRule) => send<PreviewValue[]>('POST', '/api/v1/alerts/preview', r),
+  channels: () => get<Channel[]>('/api/v1/alerts/channels', null),
+  createChannel: (c: Channel) => send<Channel>('POST', '/api/v1/alerts/channels', c),
+  deleteChannel: (id: string) => send<void>('DELETE', `/api/v1/alerts/channels/${encodeURIComponent(id)}`),
+  testChannel: (id: string) => send<{ result: string }>('POST', `/api/v1/alerts/channels/${encodeURIComponent(id)}/test`),
+  alertEvents: () => get<AlertEvent[]>('/api/v1/alerts/events', null),
 
   queryMetric: (range: TimeRange, p: MetricParams) =>
     get<Series[]>('/api/v1/metrics/query', range, [
