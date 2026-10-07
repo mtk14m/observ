@@ -5,12 +5,14 @@ import TimeRangePicker from './TimeRangePicker.vue'
 
 const route = useRoute()
 const title = computed(() => (route.meta.title as string | undefined) ?? '')
+// Pages that do not depend on the global time range hide the picker.
+const timeless = computed(() => route.meta.timeless === true)
 </script>
 
 <template>
   <header class="topbar">
     <h1>{{ title }}</h1>
-    <TimeRangePicker />
+    <TimeRangePicker v-if="!timeless" />
   </header>
 </template>
 

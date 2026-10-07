@@ -93,9 +93,11 @@ const when = (iso: string) => new Date(iso).toLocaleString()
                 <span v-if="!r.enabled" class="muted"> disabled</span>
               </td>
               <td class="rule">
-                <strong>{{ r.name }}</strong>
-                <span class="muted mono">{{ describeCondition(r) }}</span>
-                <span v-if="r.firing > 1" class="muted">{{ r.firing }} groups firing</span>
+                <div class="rule-cell">
+                  <strong>{{ r.name }}</strong>
+                  <span class="muted mono">{{ describeCondition(r) }}</span>
+                  <span v-if="r.firing > 1" class="muted">{{ r.firing }} groups firing</span>
+                </div>
               </td>
               <td class="num">
                 <template v-if="worst(r)">
@@ -163,12 +165,13 @@ h3 {
   font-size: 12px;
 }
 .rule {
+  white-space: normal !important;
+}
+.rule-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-top: 6px !important;
-  padding-bottom: 6px !important;
-  white-space: normal !important;
+  padding: 8px 0;
 }
 .side {
   display: flex;

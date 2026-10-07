@@ -24,9 +24,9 @@ export const routes: RouteRecordRaw[] = [
     name: section.name,
     component: views[section.path] ?? SectionView,
     props: views[section.path] ? undefined : { section },
-    meta: { title: section.name },
+    meta: { title: section.name, timeless: section.path === '/alerts' },
   })),
-  { path: '/traces/:id', name: 'Trace', component: TraceView, meta: { title: 'Trace' } },
+  { path: '/traces/:id', name: 'Trace', component: TraceView, meta: { title: 'Trace', timeless: true } },
   { path: '/services/:name', name: 'Service', component: ServiceView, meta: { title: 'Service' } },
 ]
 
