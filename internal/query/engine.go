@@ -599,3 +599,69 @@ func jsonMap(s string) map[string]string {
 	_ = json.Unmarshal([]byte(s), &m)
 	return m
 }
+
+// GroupCount is the number of matching records for one group.
+type GroupCount struct {
+	Labels map[string]string `json:"labels"`
+	Count  int64             `json:"count"`
+}
+
+// CountLogs counts matching log records, per value of the groupBy
+// attributes (record or resource). Without groupBy it always returns one
+// count, possibly zero.
+func (e *Engine) CountLogs(ctx context.Context, q LogQuery, groupBy []string) ([]GroupCount, error) {
+	pred, err := logsearch.Compile(q.Query)
+	if err != nil {
+		return nil, err
+	}
+	empty := []GroupCount{}
+	if len(groupBy) == 0 {
+		empty = []GroupCount{{Labels: map[string]string{}}}
+	}
+	paths, err := e.files(ctx, layout.Logs, q.TimeRange)
+	if err != nil || len(paths) == 0 {
+		return empty, err
+	}
+	cols := make([]string, len(groupBy))
+	var args []any
+	for i, k := range groupBy {
+		cols[i] = "coalesce(attributes[?], resource_attributes[?], '')"
+		args = append(args, k, k)
+	}
+	from, to := q.bounds()
+	args = append(args, from, to)
+	args = append(args, pred.Args...)
+	sel := strings.Join(append(slices.Clone(cols), "count(*)"), ", ")
+	group := ""
+	if len(cols) > 0 {
+		group = " GROUP BY ALL ORDER BY ALL"
+	}
+	rows, err := e.db.QueryContext(ctx, `SELECT `+sel+` FROM `+source(paths)+`
+		WHERE time_unix_nano >= ? AND time_unix_nano < ? AND (`+pred.Where+`)`+group, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query: count logs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := []GroupCount{}
+	for rows.Next() {
+		vals := make([]string, len(groupBy))
+		var c GroupCount
+		dest := make([]any, 0, len(groupBy)+1)
+		for i := range vals {
+			dest = append(dest, &vals[i])
+		}
+		dest = append(dest, &c.Count)
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("query: count logs: %w", err)
+		}
+		c.Labels = make(map[string]string, len(groupBy))
+		for i, k := range groupBy {
+			c.Labels[k] = vals[i]
+		}
+		out = append(out, c)
+	}
+	if len(out) == 0 {
+		return empty, rows.Err()
+	}
+	return out, rows.Err()
+}
