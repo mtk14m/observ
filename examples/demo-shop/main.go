@@ -5,8 +5,8 @@
 //	frontend   serves /products and /checkout and generates load on itself
 //	checkout   places orders: reserves stock, then charges the payment
 //	inventory  serves stock levels and reservations
-//	payment    charges cards; declines ~8% of cards, fails ~3% of the time
-//	           (issuer unavailable) and is sometimes slow
+//	payment    charges cards; one issuer (acme-bank) is often slow and
+//	           refuses about a quarter of its cards
 //
 // It is instrumented only with the official OpenTelemetry Go SDK and
 // configured with the standard OTEL_* environment variables.
@@ -215,38 +215,51 @@ func reserve(w http.ResponseWriter, r *http.Request) {
 var amounts, _ = meter.Float64Histogram("shop.payment.amount", metric.WithUnit("EUR"),
 	metric.WithExplicitBucketBoundaries(1, 2, 5, 10, 20, 50))
 
+// Card issuers. acme-bank is the troublemaker: slow and refusing many
+// cards, so that "what do failing payments have in common?" has an answer.
+var issuers = []struct {
+	name             string
+	slowPct, failPct int
+}{
+	{"acme-bank", 30, 25},
+	{"globex", 2, 2},
+	{"initech", 2, 2},
+}
+
 func pay(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orderID := r.URL.Query().Get("order")
-	ctx, span := tracer.Start(ctx, "charge card", trace.WithAttributes(attribute.String("order.id", orderID)))
+	issuer := issuers[rand.IntN(len(issuers))]
+	ctx, span := tracer.Start(ctx, "charge card", trace.WithAttributes(
+		attribute.String("order.id", orderID), attribute.String("payment.issuer", issuer.name)))
 	defer span.End()
+	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("payment.issuer", issuer.name))
 
 	latency := 20 + rand.IntN(120)
-	if rand.IntN(20) == 0 {
-		latency += 800 // the bank is slow sometimes
-		log.WarnContext(ctx, "bank gateway is slow", "order.id", orderID, "latency_ms", latency)
+	if rand.IntN(100) < issuer.slowPct {
+		latency += 800
+		log.WarnContext(ctx, "bank gateway is slow", "order.id", orderID, "payment.issuer", issuer.name, "latency_ms", latency)
 	}
 	time.Sleep(time.Duration(latency) * time.Millisecond)
 
-	if rand.IntN(100) < 3 {
-		err := errors.New("card issuer unavailable")
-		span.RecordError(err, trace.WithAttributes(attribute.String("exception.type", "IssuerUnavailable")))
-		span.SetStatus(codes.Error, err.Error())
-		log.ErrorContext(ctx, "card issuer did not answer", "order.id", orderID, "error", err)
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-	if rand.IntN(100) < 8 {
+	if rand.IntN(100) < issuer.failPct {
 		err := errors.New("card declined by issuer")
+		if rand.IntN(4) == 0 {
+			err = errors.New("card issuer unavailable")
+		}
 		span.RecordError(err, trace.WithAttributes(attribute.String("exception.type", "CardDeclined")))
 		span.SetStatus(codes.Error, err.Error())
-		log.ErrorContext(ctx, "payment refused", "order.id", orderID, "error", err)
-		http.Error(w, err.Error(), http.StatusPaymentRequired)
+		log.ErrorContext(ctx, "payment refused", "order.id", orderID, "payment.issuer", issuer.name, "error", err)
+		status := http.StatusPaymentRequired
+		if err.Error() == "card issuer unavailable" {
+			status = http.StatusServiceUnavailable
+		}
+		http.Error(w, err.Error(), status)
 		return
 	}
 	amount := 1.5 + rand.Float64()*30
 	amounts.Record(ctx, amount)
-	log.InfoContext(ctx, "payment accepted", "order.id", orderID, "amount_eur", fmt.Sprintf("%.2f", amount))
+	log.InfoContext(ctx, "payment accepted", "order.id", orderID, "payment.issuer", issuer.name, "amount_eur", fmt.Sprintf("%.2f", amount))
 	_, _ = w.Write([]byte("ok"))
 }
 

@@ -9,7 +9,7 @@ with any OpenTelemetry backend.
 | `frontend` | Serves `/products` and `/checkout`, and generates traffic on itself |
 | `checkout` | Places orders: reserves stock, then charges the payment |
 | `inventory` | Serves stock levels and reservations, and reports a stock gauge |
-| `payment` | Charges cards. It declines about 8% of them, fails about 3% of the time and is sometimes slow |
+| `payment` | Charges cards. One issuer, `acme-bank`, is often slow and refuses about a quarter of its cards |
 
 The easiest way to run it is the Docker Compose demo at the root of the repository (`make demo`).
 To run one service by hand:
