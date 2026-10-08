@@ -2,7 +2,7 @@
 # with the official OpenTelemetry SDK, sending traces, metrics and logs.
 #
 #   docker compose -f deploy/demo/docker-compose.yml up --build
-#   open http://localhost:8080
+#   open http://localhost:8080  (OBSRV_UI_PORT=8081 if 8080 is taken)
 name: obsrv-demo
 
 x-shop: &shop
@@ -13,16 +13,23 @@ x-shop: &shop
       condition: service_healthy
   environment: &shop-env
     OTEL_EXPORTER_OTLP_ENDPOINT: http://obsrv:4318
+    # The standard OpenTelemetry way to send the ingest token.
+    OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer%20demo-ingest-token
     OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=demo,service.version=1.4.2
     DEMO_ADDR: ":8000"
 
 services:
   obsrv:
     build: ../..
+    environment:
+      # Demo credentials: sign in at http://localhost:8080 with these.
+      OBSRV_ADMIN_EMAIL: admin@obsrv.local
+      OBSRV_ADMIN_PASSWORD: obsrv-demo-password
+      OBSRV_INGEST_TOKEN: demo-ingest-token
     ports:
       - "4317:4317"
       - "4318:4318"
-      - "8080:8080"
+      - "${OBSRV_UI_PORT:-8080}:8080"
     volumes:
       - obsrv-data:/data
 
@@ -62,6 +69,9 @@ services:
         condition: service_healthy
     restart: "no"
     entrypoint: ["/bin/sh", "/seed-alerts.sh"]
+    environment:
+      OBSRV_ADMIN_EMAIL: admin@obsrv.local
+      OBSRV_ADMIN_PASSWORD: obsrv-demo-password
     volumes:
       - ./seed-alerts.sh:/seed-alerts.sh:ro
 
