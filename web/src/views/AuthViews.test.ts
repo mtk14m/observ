@@ -49,7 +49,7 @@ test('sign in shows errors and never redirects elsewhere', async () => {
   vi.mocked(api.auth.login).mockResolvedValue(ada)
   await w.find('form').trigger('submit')
   await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/services') // an external "next" is ignored
+  expect(router.currentRoute.value.path).toBe('/') // an external "next" is ignored
 })
 
 test('setup creates the admin account', async () => {
@@ -69,7 +69,7 @@ test('setup creates the admin account', async () => {
   await flushPromises()
   expect(api.auth.setup).toHaveBeenCalledWith({ name: 'Ada', email: 'ada@example.com', password: 'correct horse battery' })
   expect(session.user).toEqual(ada)
-  expect(router.currentRoute.value.path).toBe('/services')
+  expect(router.currentRoute.value.path).toBe('/')
 })
 
 test('settings: change password, and admins manage users', async () => {

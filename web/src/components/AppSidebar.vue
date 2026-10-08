@@ -58,7 +58,7 @@ const groups = computed(() => {
           :aria-label="section.name"
           :data-label="section.name"
           class="item"
-          :class="{ active: route.path.startsWith(section.path) }"
+          :class="{ active: section.path === '/' ? route.path === '/' : route.path.startsWith(section.path) }"
         >
           <AppIcon :name="section.icon" :size="20" />
         </RouterLink>

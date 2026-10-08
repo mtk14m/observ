@@ -7,6 +7,8 @@ import TracesView from './views/TracesView.vue'
 import TraceView from './views/TraceView.vue'
 import ServiceView from './views/ServiceView.vue'
 import AlertsView from './views/AlertsView.vue'
+import HomeView from './views/HomeView.vue'
+import IssuesView from './views/IssuesView.vue'
 import LoginView from './views/LoginView.vue'
 import SetupView from './views/SetupView.vue'
 import SettingsView from './views/SettingsView.vue'
@@ -20,6 +22,8 @@ const views: Record<string, RouteRecordRaw['component']> = {
   '/logs': LogsView,
   '/metrics': MetricsView,
   '/alerts': AlertsView,
+  '/': HomeView,
+  '/issues': IssuesView,
 }
 
 const TITLES: Record<string, string> = {
@@ -29,7 +33,6 @@ const TITLES: Record<string, string> = {
 }
 
 export const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/services' },
   ...SECTIONS.map((section) => ({
     path: section.path,
     name: section.name,

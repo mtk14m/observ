@@ -19,7 +19,7 @@ async function submit() {
   busy.value = true
   try {
     session.user = await api.auth.setup({ name: form.name, email: form.email, password: form.password })
-    await router.replace('/services')
+    await router.replace('/')
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {

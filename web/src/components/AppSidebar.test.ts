@@ -12,7 +12,7 @@ describe('AppSidebar', () => {
   test('lists every section in order', async () => {
     const wrapper = await render('/')
     const labels = wrapper.findAll('nav a').map((a) => a.attributes('aria-label'))
-    expect(labels).toEqual(['Services', 'Traces', 'Logs', 'Metrics', 'Dashboards', 'Alerts'])
+    expect(labels).toEqual(['Home', 'Services', 'Issues', 'Traces', 'Logs', 'Metrics', 'Dashboards', 'Alerts'])
   })
 
   test('marks the current section', async () => {

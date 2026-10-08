@@ -9,10 +9,12 @@ export interface Section {
   group: number
 }
 
-export type IconName = 'services' | 'traces' | 'logs' | 'metrics' | 'dashboards' | 'alerts'
+export type IconName = 'home' | 'issues' | 'services' | 'traces' | 'logs' | 'metrics' | 'dashboards' | 'alerts'
 
 export const SECTIONS: readonly Section[] = [
+  { path: '/', name: 'Home', icon: 'home', group: 0, hint: 'What needs attention right now.' },
   { path: '/services', name: 'Services', icon: 'services', group: 0, hint: 'Services appear as soon as obsrv receives spans.' },
+  { path: '/issues', name: 'Issues', icon: 'issues', group: 0, hint: 'Errors grouped into issues.' },
   { path: '/traces', name: 'Traces', icon: 'traces', group: 1, hint: 'Send spans over OTLP to start exploring traces.' },
   { path: '/logs', name: 'Logs', icon: 'logs', group: 1, hint: 'Send log records over OTLP to start searching logs.' },
   { path: '/metrics', name: 'Metrics', icon: 'metrics', group: 1, hint: 'Send metrics over OTLP to start building charts.' },

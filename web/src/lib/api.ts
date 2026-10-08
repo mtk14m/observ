@@ -109,6 +109,49 @@ export interface PreviewValue {
   breached: boolean
 }
 
+export interface Issue {
+  id: string
+  service: string
+  kind: 'log' | 'span'
+  title: string
+  example: string
+  count: number
+  previous_count: number
+  first_seen: number
+  last_seen: number
+  status: 'new' | 'rising' | 'ongoing'
+  buckets: number[]
+  example_trace_id: string
+}
+
+export interface Deployment {
+  service: string
+  version: string
+  previous: string
+  at: number
+}
+
+export interface CompareItem {
+  key: string
+  value: string
+  selection: number
+  baseline: number
+}
+
+export interface CompareResult {
+  selection_total: number
+  baseline_total: number
+  items: CompareItem[]
+}
+
+export interface CompareParams {
+  signal: 'logs' | 'spans'
+  q?: string
+  errors?: boolean
+  selFrom?: string
+  selTo?: string
+}
+
 export interface LogRecord {
   time: number
   service: string
@@ -286,6 +329,17 @@ export const api = {
     get<ServiceDetail>(`/api/v1/services/${encodeURIComponent(name)}`, range),
 
   serviceMap: (range: TimeRange) => get<Edge[]>('/api/v1/service-map', range),
+
+  issues: (range: TimeRange) => get<Issue[]>('/api/v1/issues', range),
+  deployments: (range: TimeRange) => get<Deployment[]>('/api/v1/deployments', range),
+  compare: (range: TimeRange, p: CompareParams) =>
+    get<CompareResult>('/api/v1/compare', range, [
+      ['signal', p.signal],
+      ['q', p.q],
+      ['errors', p.errors],
+      ['sel_from', p.selFrom],
+      ['sel_to', p.selTo],
+    ]),
 
   logs: (range: TimeRange, q: string, limit?: number) =>
     get<LogRecord[]>('/api/v1/logs', range, [['q', q], ['limit', limit]]),

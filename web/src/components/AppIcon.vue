@@ -9,6 +9,8 @@ defineProps<{ name: IconName | UtilityIcon; size?: number }>()
 
 // 24×24 stroke icons drawn for obsrv.
 const paths: Record<string, string> = {
+  home: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z',
+  issues: 'M12 4l9 16H3L12 4zm0 6v4m0 3v.5',
   services: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 0v18m8-13.5L12 12 4 7.5',
   traces: 'M4 6h10M8 12h12M6 18h8',
   logs: 'M5 5h14M5 9.5h14M5 14h9M5 18.5h12',
