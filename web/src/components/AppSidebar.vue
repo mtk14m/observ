@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { SECTIONS } from '@/sections'
 import { useTheme } from '@/composables/useTheme'
+import { session, signOut } from '@/lib/session'
 import AppIcon from './AppIcon.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { theme, toggle } = useTheme()
+
+const menuOpen = ref(false)
+const menuRoot = ref<HTMLElement>()
+const initial = computed(() => (session.user?.name || session.user?.email || '?').charAt(0).toUpperCase())
+async function doSignOut() {
+  menuOpen.value = false
+  await signOut()
+  await router.push('/login')
+}
+function onDocumentClick(e: MouseEvent) {
+  if (menuOpen.value && !menuRoot.value?.contains(e.target as Node)) menuOpen.value = false
+}
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 // Navigation keeps the global time range, never page-specific filters.
 const timeQuery = computed(() => {
@@ -58,6 +74,20 @@ const groups = computed(() => {
     >
       <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
     </button>
+
+    <div v-if="session.user" ref="menuRoot" class="account">
+      <button type="button" class="avatar" :aria-expanded="menuOpen" aria-label="Account" @click="menuOpen = !menuOpen">
+        {{ initial }}
+      </button>
+      <div v-if="menuOpen" class="user-menu" role="menu">
+        <div class="who">
+          <strong>{{ session.user.name }}</strong>
+          <span class="muted">{{ session.user.email }}</span>
+        </div>
+        <RouterLink to="/settings" class="entry" role="menuitem" @click="menuOpen = false">Settings</RouterLink>
+        <button type="button" class="entry sign-out" role="menuitem" @click="doSignOut">Sign out</button>
+      </div>
+    </div>
   </aside>
 </template>
 
@@ -108,6 +138,58 @@ nav {
 .item.active {
   background: var(--accent-soft);
   color: var(--accent-text);
+}
+.account {
+  position: relative;
+  margin-top: var(--space-2);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.user-menu {
+  position: absolute;
+  left: calc(100% + 12px);
+  bottom: 0;
+  z-index: 30;
+  min-width: 220px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+}
+.who {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-1);
+  font-size: 13px;
+}
+.entry {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.entry:hover {
+  background: var(--bg-hover);
 }
 /* Label tooltip on hover and keyboard focus. */
 .item::after {

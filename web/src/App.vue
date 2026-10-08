@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTopBar from './components/AppTopBar.vue'
+
+const route = useRoute()
 </script>
 
 <template>
-  <div class="shell">
+  <RouterView v-if="route.meta.public" />
+  <div v-else class="shell">
     <AppSidebar />
     <div class="main">
       <AppTopBar />

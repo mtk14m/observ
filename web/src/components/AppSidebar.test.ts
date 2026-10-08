@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, expect, test, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import AppSidebar from './AppSidebar.vue'
 import { makeRouter } from '@/test/router'
 
@@ -34,5 +34,31 @@ describe('AppSidebar', () => {
     const before = toggle.attributes('aria-label')
     await toggle.trigger('click')
     expect(toggle.attributes('aria-label')).not.toBe(before)
+  })
+})
+
+describe('user menu', () => {
+  test('shows the user and signs out', async () => {
+    const { session } = await import('@/lib/session')
+    session.user = { id: 'u1', email: 'ada@example.com', name: 'Ada Lovelace', role: 'admin' }
+    const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetch)
+
+    const router = await makeRouter('/logs')
+    const wrapper = mount(AppSidebar, { global: { plugins: [router] } })
+    const avatar = wrapper.find('button.avatar')
+    expect(avatar.text()).toBe('A')
+    await avatar.trigger('click')
+    const menu = wrapper.find('.user-menu')
+    expect(menu.text()).toContain('Ada Lovelace')
+    expect(menu.text()).toContain('ada@example.com')
+    expect(menu.find('a[href="/settings"]').exists()).toBe(true)
+
+    await menu.find('button.sign-out').trigger('click')
+    await flushPromises()
+    expect(fetch.mock.calls[0]![0]).toBe('/api/v1/auth/logout')
+    expect(session.user).toBeNull()
+    expect(router.currentRoute.value.path).toBe('/login')
+    vi.unstubAllGlobals()
   })
 })

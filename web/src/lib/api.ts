@@ -190,6 +190,32 @@ export interface MetricParams {
   step?: string
 }
 
+export interface User {
+  id: string
+  email: string
+  name: string
+  role: 'admin' | 'member'
+  created_at?: string
+}
+
+export interface NewUser {
+  email: string
+  name: string
+  password: string
+  role: 'admin' | 'member'
+}
+
+let unauthorized: (() => void) | null = null
+
+/** Sets what to do when the session has expired (redirect to sign in). */
+export function onUnauthorized(handler: (() => void) | null) {
+  unauthorized = handler
+}
+
+function checkSession(path: string, status: number) {
+  if (status === 401 && !path.startsWith('/api/v1/auth/')) unauthorized?.()
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -220,6 +246,7 @@ async function get<T>(path: string, range: TimeRange | null, params: [string, Pa
   const qs = search.toString()
   const res = await fetch(qs ? `${path}?${qs}` : path)
   const body = (await res.json().catch(() => ({}))) as { data?: T; error?: string }
+  checkSession(path, res.status)
   if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status)
   return body.data as T
 }
@@ -232,11 +259,25 @@ async function send<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: u
   })
   if (res.status === 204) return undefined as T
   const json = (await res.json().catch(() => ({}))) as { data?: T; error?: string }
+  checkSession(path, res.status)
   if (!res.ok) throw new ApiError(json.error ?? res.statusText, res.status)
   return json.data as T
 }
 
 export const api = {
+  auth: {
+    status: () => get<{ setup_required: boolean }>('/api/v1/auth/status', null),
+    setup: (u: Omit<NewUser, 'role'>) => send<User>('POST', '/api/v1/auth/setup', u),
+    login: (email: string, password: string) => send<User>('POST', '/api/v1/auth/login', { email, password }),
+    logout: () => send<void>('POST', '/api/v1/auth/logout'),
+    me: () => get<User>('/api/v1/auth/me', null),
+    changePassword: (current: string, next: string) =>
+      send<void>('PUT', '/api/v1/auth/me/password', { current_password: current, new_password: next }),
+  },
+  users: () => get<User[]>('/api/v1/users', null),
+  createUser: (u: NewUser) => send<User>('POST', '/api/v1/users', u),
+  deleteUser: (id: string) => send<void>('DELETE', `/api/v1/users/${encodeURIComponent(id)}`),
+
   services: (range: TimeRange) => get<ServiceSummary[]>('/api/v1/services', range),
 
   service: (range: TimeRange, name: string) =>
