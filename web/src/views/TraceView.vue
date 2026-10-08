@@ -10,6 +10,7 @@ import AttributeList from '@/components/AttributeList.vue'
 import StatusMessage from '@/components/StatusMessage.vue'
 import LevelPill from '@/components/LevelPill.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import Val from '@/components/Val.vue'
 
 const route = useRoute()
 const traceId = computed(() => String(route.params.id))
@@ -108,7 +109,7 @@ const selected = ref<Span | null>(null)
               </button>
               <span v-else class="toggle-space" />
               <span class="bar-mark" :style="{ background: color(r.span.service) }" aria-hidden="true" />
-              <span class="svc">{{ r.span.service }}</span>
+              <Val k="service.name" :v="r.span.service" class="svc" />
               <span class="op">{{ r.span.name }}</span>
               <span v-if="r.span.status_code === 'Error'" class="err" aria-label="error">⚠</span>
             </div>

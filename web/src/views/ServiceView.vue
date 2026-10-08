@@ -6,13 +6,15 @@ import { useQuery } from '@/composables/useQuery'
 import { resolveNs } from '@/composables/useResolvedRange'
 import { api } from '@/lib/api'
 import { formatMs, formatPercent, formatRate } from '@/lib/format'
+import { absolute } from '@/lib/timeRange'
 import TimeSeriesChart from '@/components/charts/TimeSeriesChart.vue'
 import StatTile from '@/components/StatTile.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusMessage from '@/components/StatusMessage.vue'
 
 const route = useRoute()
-const { range, query } = useTimeRange()
+const { range, query, setRange } = useTimeRange()
+const zoom = (r: { from: number; to: number }) => setRange(absolute(r.from, r.to))
 const name = computed(() => String(route.params.name))
 
 const detail = useQuery(
@@ -60,15 +62,15 @@ const logsLink = computed(() => ({ path: '/logs', query: { ...query.value, q: `s
       <section class="charts">
         <div class="card">
           <h3>Requests</h3>
-          <TimeSeriesChart :series="rate" :from="d.from" :to="d.to" :format="formatRate" :height="160" />
+          <TimeSeriesChart :series="rate" :from="d.from" :to="d.to" :format="formatRate" :height="160" @zoom="zoom" />
         </div>
         <div class="card">
           <h3>Error rate</h3>
-          <TimeSeriesChart :series="errorRate" :from="d.from" :to="d.to" :format="formatPercent" :height="160" />
+          <TimeSeriesChart :series="errorRate" :from="d.from" :to="d.to" :format="formatPercent" :height="160" @zoom="zoom" />
         </div>
         <div class="card">
           <h3>Latency</h3>
-          <TimeSeriesChart :series="latency" :from="d.from" :to="d.to" :format="formatMs" :height="160" />
+          <TimeSeriesChart :series="latency" :from="d.from" :to="d.to" :format="formatMs" :height="160" @zoom="zoom" />
         </div>
       </section>
 

@@ -177,6 +177,8 @@ export interface Series {
 }
 
 export interface TraceFilters {
+  /** Span search syntax: service:x status:error attr:value text */
+  q?: string
   service?: string
   errors?: boolean
   minDurationMs?: number
@@ -296,6 +298,7 @@ export const api = {
 
   traces: (range: TimeRange, f: TraceFilters = {}) =>
     get<TraceSummary[]>('/api/v1/traces', range, [
+      ['q', f.q],
       ['service', f.service],
       ['errors', f.errors],
       ['min_duration_ms', f.minDurationMs],

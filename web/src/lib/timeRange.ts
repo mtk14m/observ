@@ -59,11 +59,27 @@ export function resolve(range: TimeRange, now: Date): { from: Date; to: Date } |
   return { from, to }
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const pad = (n: number) => String(n).padStart(2, '0')
+const day = (d: Date) => `${MONTHS[d.getMonth()]} ${d.getDate()}`
+const hm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+
 /** Returns a human-readable label for the range. */
 export function label(range: TimeRange): string {
   if (range.to === 'now') {
     const preset = PRESETS.find((p) => p.from === range.from)
     if (preset) return preset.label
   }
+  if (ISO.test(range.from) && ISO.test(range.to)) {
+    const a = new Date(range.from)
+    const b = new Date(range.to)
+    const end = day(a) === day(b) ? hm(b) : `${day(b)}, ${hm(b)}`
+    return `${day(a)}, ${hm(a)} → ${end}`
+  }
   return `${range.from} → ${range.to}`
+}
+
+/** An absolute range from unix nanoseconds, e.g. a zoom on a chart. */
+export function absolute(fromNs: number, toNs: number): TimeRange {
+  return { from: new Date(fromNs / 1e6).toISOString(), to: new Date(toNs / 1e6).toISOString() }
 }

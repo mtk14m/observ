@@ -6,13 +6,15 @@ import { useQuery } from '@/composables/useQuery'
 import { resolveNs } from '@/composables/useResolvedRange'
 import { api } from '@/lib/api'
 import { aggregations, seriesLabel, valueFormatter } from '@/lib/metrics'
+import { absolute } from '@/lib/timeRange'
 import TimeSeriesChart from '@/components/charts/TimeSeriesChart.vue'
 import StatusMessage from '@/components/StatusMessage.vue'
 import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { range } = useTimeRange()
+const { range, setRange } = useTimeRange()
+const zoom = (r: { from: number; to: number }) => setRange(absolute(r.from, r.to))
 const filter = ref('')
 
 const metrics = useQuery(() => ({ ...range.value }), (r) => api.metrics(r))
@@ -115,6 +117,7 @@ const format = computed(() => (current.value ? valueFormatter(current.value, agg
             :to="result.data.value.to"
             :format="format"
             :height="280"
+            @zoom="zoom"
           />
           <p v-if="hidden" class="muted more">{{ hidden }} more series not shown. Group by a less detailed attribute.</p>
         </div>

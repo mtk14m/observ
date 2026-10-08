@@ -10,6 +10,8 @@ const props = withDefaults(
   { height: 96 },
 )
 
+const emit = defineEmits<{ zoom: [range: { from: number; to: number }] }>()
+
 const PAD = { top: 6, right: 12, bottom: 20, left: 44 }
 const root = ref<HTMLElement>()
 const width = ref(640)
@@ -58,6 +60,29 @@ const bars = computed(() =>
   }),
 )
 
+// Drag across the bars to zoom into a period.
+const dragFrom = ref<number | null>(null)
+const dragTo = ref<number | null>(null)
+function svgX(e: MouseEvent) {
+  const rect = (e.currentTarget as Element).getBoundingClientRect()
+  return Math.min(Math.max(e.clientX - rect.left, PAD.left), PAD.left + innerW.value)
+}
+const timeAt = (px: number) => props.from + ((px - PAD.left) / innerW.value) * (props.to - props.from)
+function onDown(e: PointerEvent) {
+  dragFrom.value = dragTo.value = svgX(e)
+}
+function onMove(e: PointerEvent) {
+  if (dragFrom.value !== null) dragTo.value = svgX(e)
+}
+function onUp(e: PointerEvent) {
+  if (dragFrom.value === null) return
+  const a = dragFrom.value
+  const b = svgX(e)
+  dragFrom.value = dragTo.value = null
+  if (Math.abs(b - a) < 5) return
+  emit('zoom', { from: timeAt(Math.min(a, b)), to: timeAt(Math.max(a, b)) })
+}
+
 const hover = ref<HistogramBucket | null>(null)
 const hoverX = computed(() => (hover.value ? x(hover.value.t) : 0))
 const xTicks = computed(() => timeTicks(props.from, props.to, Math.max(2, Math.floor(innerW.value / 110))))
@@ -65,7 +90,16 @@ const xTicks = computed(() => timeTicks(props.from, props.to, Math.max(2, Math.f
 
 <template>
   <div ref="root" class="bars">
-    <svg :width="width" :height="height" role="img" aria-label="Log volume by severity">
+    <svg
+      :width="width"
+      :height="height"
+      role="img"
+      aria-label="Log volume by severity — drag to zoom"
+      @pointerdown="onDown"
+      @pointermove="onMove"
+      @pointerup="onUp"
+      @pointerleave="dragFrom = dragTo = null"
+    >
       <g class="grid">
         <line :x1="PAD.left" :x2="width - PAD.right" :y1="y(0)" :y2="y(0)" />
         <text :x="PAD.left - 8" :y="y(yMax)" dy="0.32em" text-anchor="end">{{ formatCompact(yMax) }}</text>
@@ -93,6 +127,14 @@ const xTicks = computed(() => timeTicks(props.from, props.to, Math.max(2, Math.f
           rx="1"
         />
       </g>
+      <rect
+        v-if="dragFrom !== null && dragTo !== null && Math.abs(dragTo - dragFrom) >= 5"
+        class="selection"
+        :x="Math.min(dragFrom, dragTo)"
+        :y="PAD.top"
+        :width="Math.abs(dragTo - dragFrom)"
+        :height="innerH"
+      />
     </svg>
 
     <div v-if="hover" class="tooltip" :style="{ left: `${hoverX}px` }" role="status">
@@ -118,6 +160,13 @@ const xTicks = computed(() => timeTicks(props.from, props.to, Math.max(2, Math.f
 }
 svg {
   display: block;
+  cursor: crosshair;
+  user-select: none;
+}
+.selection {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  pointer-events: none;
 }
 .grid line {
   stroke: var(--grid);

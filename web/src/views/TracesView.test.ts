@@ -26,7 +26,7 @@ async function render(path: string) {
 test('passes filters from the URL and links each trace', async () => {
   const { w } = await render('/traces?service=frontend&errors=true&min_ms=100')
   expect(api.traces).toHaveBeenLastCalledWith({ from: 'now-1h', to: 'now' },
-    { service: 'frontend', errors: true, minDurationMs: 100 })
+    { q: undefined, service: 'frontend', errors: true, minDurationMs: 100 })
   const row = w.find('tbody tr')
   expect(row.text()).toContain('POST /checkout')
   expect(row.text()).toContain('250 ms')
@@ -57,4 +57,15 @@ test('changing a filter updates the URL', async () => {
 test('shows the number of traces', async () => {
   const { w } = await render('/traces')
   expect(w.find('.tab.active').text()).toContain('1')
+})
+
+test('searches spans with the query syntax', async () => {
+  const { w, router } = await render('/traces')
+  await w.find('input[aria-label="Search traces"]').setValue('payment.issuer:acme-bank')
+  await w.find('form[role="search"]').trigger('submit')
+  await flushPromises()
+  expect(router.currentRoute.value.query.q).toBe('payment.issuer:acme-bank')
+  expect(api.traces).toHaveBeenLastCalledWith({ from: 'now-1h', to: 'now' },
+    { q: 'payment.issuer:acme-bank', service: undefined, errors: undefined, minDurationMs: undefined })
+  expect(w.find('.active-filter').text()).toContain('acme-bank')
 })

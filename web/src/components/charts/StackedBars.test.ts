@@ -24,3 +24,14 @@ test('hovering a bar shows its counts', async () => {
   expect(w.find('.tooltip').text()).toContain('10INFO')
   expect(w.find('.tooltip').text()).toContain('2ERROR')
 })
+
+test('dragging across the bars emits the selected period', () => {
+  const w = mount(StackedBars, { props: { buckets, from: 0, to: 20 * s } })
+  // Plot spans 44px → 628px (584px) for [0s, 20s).
+  const svg = w.find('svg').element
+  svg.dispatchEvent(new MouseEvent('pointerdown', { clientX: 44 + 146, bubbles: true }))
+  svg.dispatchEvent(new MouseEvent('pointerup', { clientX: 44 + 438, bubbles: true }))
+  const [[range]] = w.emitted('zoom') as [[{ from: number; to: number }]]
+  expect(Math.round(range.from / s)).toBe(5)
+  expect(Math.round(range.to / s)).toBe(15)
+})

@@ -7,6 +7,7 @@ import { resolveNs } from '@/composables/useResolvedRange'
 import { api, type LogRecord } from '@/lib/api'
 import { formatCompact, formatDateTime, formatTime } from '@/lib/format'
 import { addFilter, filters, removeFilter } from '@/lib/searchQuery'
+import { absolute } from '@/lib/timeRange'
 import StackedBars from '@/components/charts/StackedBars.vue'
 import SidePanel from '@/components/SidePanel.vue'
 import AttributeList from '@/components/AttributeList.vue'
@@ -14,6 +15,7 @@ import StatusMessage from '@/components/StatusMessage.vue'
 import LevelPill from '@/components/LevelPill.vue'
 import FacetChip from '@/components/FacetChip.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import Val from '@/components/Val.vue'
 
 const LIMIT = 200
 // Facets offered as chips, and the query key each one adds.
@@ -25,7 +27,8 @@ const FACETS = [
 
 const route = useRoute()
 const router = useRouter()
-const { range } = useTimeRange()
+const { range, setRange } = useTimeRange()
+const zoom = (r: { from: number; to: number }) => setRange(absolute(r.from, r.to))
 
 const q = computed(() => (typeof route.query.q === 'string' ? route.query.q : ''))
 const draft = ref(q.value)
@@ -65,6 +68,7 @@ const selected = ref<LogRecord | null>(null)
           <AppIcon name="search" :size="16" />
           <input
             v-model="draft"
+            data-search
             type="search"
             class="input mono"
             placeholder='Search for attribute:value or text, e.g. service:api level:error "timeout"'
@@ -97,7 +101,7 @@ const selected = ref<LogRecord | null>(null)
 
     <template v-else-if="result.data.value">
       <section class="histogram">
-        <StackedBars :buckets="result.data.value.histogram" :from="result.data.value.from" :to="result.data.value.to" :height="110" />
+        <StackedBars :buckets="result.data.value.histogram" :from="result.data.value.from" :to="result.data.value.to" :height="110" @zoom="zoom" />
       </section>
 
       <div class="tabs">
@@ -128,8 +132,8 @@ const selected = ref<LogRecord | null>(null)
             @click="selected = l"
           >
             <td class="mono muted">{{ formatTime(l.time) }}</td>
-            <td><LevelPill :level="l.severity" /></td>
-            <td>{{ l.service }}</td>
+            <td><Val k="level" :v="l.severity"><LevelPill :level="l.severity" /></Val></td>
+            <td><Val k="service.name" :v="l.service" /></td>
             <td class="mono truncate">{{ l.body }}</td>
           </tr>
         </tbody>

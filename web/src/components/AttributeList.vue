@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import Val from './Val.vue'
+
 const props = defineProps<{ title: string; attributes: Record<string, string> }>()
 const entries = computed(() => Object.entries(props.attributes).sort(([a], [b]) => a.localeCompare(b)))
 </script>
@@ -11,7 +13,7 @@ const entries = computed(() => Object.entries(props.attributes).sort(([a], [b]) 
     <dl>
       <template v-for="[k, v] in entries" :key="k">
         <dt>{{ k }}</dt>
-        <dd>{{ v }}</dd>
+        <dd><Val :k="k" :v="v" /></dd>
       </template>
     </dl>
   </section>

@@ -19,6 +19,8 @@ const props = withDefaults(
   { format: (v: number) => String(v), height: 200 },
 )
 
+const emit = defineEmits<{ zoom: [range: { from: number; to: number }] }>()
+
 const PAD = { top: 8, right: 12, bottom: 22, left: 56 }
 const root = ref<HTMLElement>()
 const width = ref(640)
@@ -68,9 +70,31 @@ const paths = computed(() =>
 const allTimes = computed(() => [...new Set(props.series.flatMap((s) => s.points.map((p) => p.t)))].sort((a, b) => a - b))
 const hoverT = ref<number | null>(null)
 
-function onMove(e: PointerEvent) {
+// Pointer position in SVG coordinates, from the overlay that covers the plot.
+function plotX(e: MouseEvent) {
   const rect = (e.currentTarget as Element).getBoundingClientRect()
-  const px = e.clientX - rect.left + PAD.left
+  return Math.min(Math.max(e.clientX - rect.left + PAD.left, PAD.left), PAD.left + innerW.value)
+}
+const timeAt = (px: number) => props.from + ((px - PAD.left) / innerW.value) * (props.to - props.from)
+
+// Drag across the plot to zoom into a period.
+const dragFrom = ref<number | null>(null)
+const dragTo = ref<number | null>(null)
+function onDown(e: PointerEvent) {
+  dragFrom.value = dragTo.value = plotX(e)
+}
+function onUp(e: PointerEvent) {
+  if (dragFrom.value === null) return
+  const a = dragFrom.value
+  const b = plotX(e)
+  dragFrom.value = dragTo.value = null
+  if (Math.abs(b - a) < 5) return // a click, not a drag
+  emit('zoom', { from: timeAt(Math.min(a, b)), to: timeAt(Math.max(a, b)) })
+}
+
+function onMove(e: PointerEvent) {
+  const px = plotX(e)
+  if (dragFrom.value !== null) dragTo.value = px
   let best: number | null = null
   for (const t of allTimes.value) {
     if (best === null || Math.abs(x(t) - px) < Math.abs(x(best) - px)) best = t
@@ -143,13 +167,23 @@ const lastValue = (s: ChartSeries) => s.points.at(-1)?.v
       </g>
 
       <rect
+        v-if="dragFrom !== null && dragTo !== null && Math.abs(dragTo - dragFrom) >= 5"
+        class="selection"
+        :x="Math.min(dragFrom, dragTo)"
+        :y="PAD.top"
+        :width="Math.abs(dragTo - dragFrom)"
+        :height="innerH"
+      />
+      <rect
         class="overlay"
         :x="PAD.left"
         :y="PAD.top"
         :width="innerW"
         :height="innerH"
         @pointermove="onMove"
-        @pointerleave="hoverT = null"
+        @pointerdown="onDown"
+        @pointerup="onUp"
+        @pointerleave="hoverT = null; dragFrom = dragTo = null"
       />
     </svg>
 
@@ -212,6 +246,12 @@ svg {
 .overlay {
   fill: transparent;
   cursor: crosshair;
+}
+.selection {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1;
+  pointer-events: none;
 }
 .tooltip {
   position: absolute;

@@ -45,6 +45,14 @@ describe('label', () => {
     expect(label({ from: 'now-7d', to: 'now' })).toBe('Past 7 days')
   })
 
+  test('formats absolute ranges in local time', () => {
+    const from = new Date(2026, 9, 7, 21, 2).toISOString()
+    const to = new Date(2026, 9, 7, 21, 15, 30).toISOString()
+    expect(label({ from, to })).toBe('Oct 7, 21:02 → 21:15')
+    const nextDay = new Date(2026, 9, 8, 1, 0).toISOString()
+    expect(label({ from, to: nextDay })).toBe('Oct 7, 21:02 → Oct 8, 01:00')
+  })
+
   test('falls back to the raw expressions', () => {
     expect(label({ from: 'now-3h', to: 'now-1h' })).toBe('now-3h → now-1h')
   })

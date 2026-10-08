@@ -45,3 +45,30 @@ test('breaks the line across gaps in the data instead of inventing values', () =
   const d = w.find('path.line').attributes('d')!
   expect(d.match(/M/g)).toHaveLength(2)
 })
+
+describe('drag to zoom', () => {
+  // Plot spans 56px → 628px (572px) for [0s, 30s): x = 56 + t/30 × 572.
+  const at = (sec: number) => 56 + (sec / 30) * 572
+
+  test('dragging across the plot emits the selected period', async () => {
+    const w = mount(TimeSeriesChart, { props: { series, from: 0, to: 30 * s } })
+    const overlay = w.find('rect.overlay').element
+    // clientX is relative to the overlay, which starts at the plot's left edge.
+    overlay.dispatchEvent(new MouseEvent('pointerdown', { clientX: at(10) - 56, bubbles: true }))
+    overlay.dispatchEvent(new MouseEvent('pointermove', { clientX: at(20) - 56, bubbles: true }))
+    await nextTick()
+    expect(w.find('rect.selection').exists()).toBe(true)
+    overlay.dispatchEvent(new MouseEvent('pointerup', { clientX: at(20) - 56, bubbles: true }))
+    const [[range]] = w.emitted('zoom') as [[{ from: number; to: number }]]
+    expect(Math.round(range.from / s)).toBe(10)
+    expect(Math.round(range.to / s)).toBe(20)
+  })
+
+  test('a click without dragging does not zoom', () => {
+    const w = mount(TimeSeriesChart, { props: { series, from: 0, to: 30 * s } })
+    const overlay = w.find('rect.overlay').element
+    overlay.dispatchEvent(new MouseEvent('pointerdown', { clientX: 100, bubbles: true }))
+    overlay.dispatchEvent(new MouseEvent('pointerup', { clientX: 101, bubbles: true }))
+    expect(w.emitted('zoom')).toBeUndefined()
+  })
+})

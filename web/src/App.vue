@@ -2,6 +2,8 @@
 import { useRoute } from 'vue-router'
 import AppSidebar from './components/AppSidebar.vue'
 import AppTopBar from './components/AppTopBar.vue'
+import ValueMenu from './components/ValueMenu.vue'
+import CommandPalette from './components/CommandPalette.vue'
 
 const route = useRoute()
 </script>
@@ -15,6 +17,8 @@ const route = useRoute()
       <main class="content">
         <RouterView />
       </main>
+      <ValueMenu />
+      <CommandPalette />
     </div>
   </div>
 </template>
