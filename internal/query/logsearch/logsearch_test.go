@@ -60,3 +60,31 @@ func TestCompileErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestCompileSpans(t *testing.T) {
+	tests := []struct {
+		query string
+		where string
+		args  []any
+	}{
+		{"checkout", "(contains(lower(name), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))", []any{"checkout", "checkout"}},
+		{"status:error", "status_code IN (?)", []any{"Error"}},
+		{"status:ok,unset", "status_code IN (?, ?)", []any{"Ok", "Unset"}},
+		{"service:payment", "service_name = ?", []any{"payment"}},
+		{"payment.issuer:acme-bank", "coalesce(attributes[?], resource_attributes[?]) = ?", []any{"payment.issuer", "payment.issuer", "acme-bank"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			got, err := logsearch.CompileSpans(tt.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Where != tt.where || !reflect.DeepEqual(got.Args, tt.args) {
+				t.Errorf("got %q %#v, want %q %#v", got.Where, got.Args, tt.where, tt.args)
+			}
+		})
+	}
+	if _, err := logsearch.CompileSpans("status:broken"); !errors.Is(err, logsearch.ErrSyntax) {
+		t.Errorf("unknown status: %v, want ErrSyntax", err)
+	}
+}

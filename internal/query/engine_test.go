@@ -227,6 +227,13 @@ func TestSearchTraces(t *testing.T) {
 	if len(errs) != 1 || errs[0].TraceID != trace1H {
 		t.Errorf("errors only = %+v", errs)
 	}
+	byAttr, err := e.SearchTraces(t.Context(), query.TraceQuery{TimeRange: window, Query: `http.route:"POST /pay"`})
+	if err != nil || len(byAttr) != 1 || byAttr[0].TraceID != trace1H {
+		t.Errorf("traces with a span matching an attribute = %+v, %v", byAttr, err)
+	}
+	if _, err := e.SearchTraces(t.Context(), query.TraceQuery{TimeRange: window, Query: "status:nope"}); err == nil {
+		t.Error("invalid span query returned nil error")
+	}
 	slow, _ := e.SearchTraces(t.Context(), query.TraceQuery{TimeRange: window, MinDuration: 100 * time.Millisecond})
 	if len(slow) != 1 || slow[0].TraceID != trace1H {
 		t.Errorf("min duration = %+v", slow)

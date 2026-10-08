@@ -301,6 +301,8 @@ func (e *Engine) LogHistogram(ctx context.Context, q LogQuery, step time.Duratio
 // TraceQuery selects traces.
 type TraceQuery struct {
 	TimeRange
+	// Query keeps traces with at least one span matching it (span search syntax).
+	Query       string
 	Service     string
 	ErrorsOnly  bool
 	MinDuration time.Duration
@@ -321,6 +323,10 @@ type TraceSummary struct {
 
 // SearchTraces returns matching traces, most recent first.
 func (e *Engine) SearchTraces(ctx context.Context, q TraceQuery) ([]TraceSummary, error) {
+	pred, err := logsearch.CompileSpans(q.Query)
+	if err != nil {
+		return nil, err
+	}
 	paths, err := e.files(ctx, layout.Spans, q.TimeRange)
 	if err != nil || len(paths) == 0 {
 		return []TraceSummary{}, err
@@ -338,6 +344,10 @@ func (e *Engine) SearchTraces(ctx context.Context, q TraceQuery) ([]TraceSummary
 	if q.MinDuration > 0 {
 		having += " AND max(end_time_unix_nano) - min(start_time_unix_nano) >= ?"
 		args = append(args, q.MinDuration.Nanoseconds())
+	}
+	if q.Query != "" {
+		having += " AND bool_or(" + pred.Where + ")"
+		args = append(args, pred.Args...)
 	}
 	args = append(args, clamp(q.Limit, defaultTraceLimit, maxTraceLimit))
 

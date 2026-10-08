@@ -180,6 +180,7 @@ func (h *handler) traces(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := h.q.SearchTraces(r.Context(), query.TraceQuery{
 		TimeRange:   tr,
+		Query:       r.URL.Query().Get("q"),
 		Service:     r.URL.Query().Get("service"),
 		ErrorsOnly:  r.URL.Query().Get("errors") == "true",
 		MinDuration: time.Duration(minMs) * time.Millisecond,

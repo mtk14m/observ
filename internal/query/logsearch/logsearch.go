@@ -28,8 +28,54 @@ type Predicate struct {
 	Args  []any
 }
 
+// dialect maps the syntax onto one signal's columns.
+type dialect struct {
+	text  string // column searched by free text
+	level func(values []string) (string, []any, error)
+}
+
+var logsDialect = dialect{
+	text: "body",
+	level: func(values []string) (string, []any, error) {
+		args := make([]any, len(values))
+		for i, v := range values {
+			args[i] = strings.ToUpper(v)
+		}
+		return "upper(severity_text) IN (" + placeholders(len(args)) + ")", args, nil
+	},
+}
+
+var spansDialect = dialect{
+	text: "name",
+	level: func(values []string) (string, []any, error) {
+		args := make([]any, len(values))
+		for i, v := range values {
+			switch strings.ToLower(v) {
+			case "error":
+				args[i] = "Error"
+			case "ok":
+				args[i] = "Ok"
+			case "unset":
+				args[i] = "Unset"
+			default:
+				return "", nil, fmt.Errorf("%w: span status must be error, ok or unset, got %q", ErrSyntax, v)
+			}
+		}
+		return "status_code IN (" + placeholders(len(args)) + ")", args, nil
+	},
+}
+
+func placeholders(n int) string { return strings.TrimSuffix(strings.Repeat("?, ", n), ", ") }
+
+// CompileSpans parses query into a predicate over the public spans schema:
+// free text matches the span name and attribute values, and status: (also
+// level:) matches error, ok or unset.
+func CompileSpans(query string) (Predicate, error) { return compile(query, spansDialect) }
+
 // Compile parses query into a predicate over the public logs schema.
-func Compile(query string) (Predicate, error) {
+func Compile(query string) (Predicate, error) { return compile(query, logsDialect) }
+
+func compile(query string, d dialect) (Predicate, error) {
 	terms, err := tokenize(query)
 	if err != nil {
 		return Predicate{}, err
@@ -40,7 +86,7 @@ func Compile(query string) (Predicate, error) {
 	var clauses []string
 	var args []any
 	for _, t := range terms {
-		clause, a, err := compileTerm(t)
+		clause, a, err := compileTerm(t, d)
 		if err != nil {
 			return Predicate{}, err
 		}
@@ -59,25 +105,23 @@ type term struct {
 	value   string
 }
 
-func compileTerm(t term) (string, []any, error) {
+func compileTerm(t term, d dialect) (string, []any, error) {
 	switch strings.ToLower(t.key) {
 	case "":
 		v := strings.ToLower(t.value)
-		return "(contains(lower(body), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))",
+		return "(contains(lower(" + d.text + "), ?) OR contains(lower(array_to_string(map_values(attributes), ' ')), ?))",
 			[]any{v, v}, nil
 	case "service":
 		return "service_name = ?", []any{t.value}, nil
 	case "level", "status", "severity":
-		levels := strings.Split(t.value, ",")
-		args := make([]any, 0, len(levels))
-		for _, l := range levels {
+		var levels []string
+		for _, l := range strings.Split(t.value, ",") {
 			if l = strings.TrimSpace(l); l == "" {
 				return "", nil, fmt.Errorf("%w: empty level in %q", ErrSyntax, t.value)
 			}
-			args = append(args, strings.ToUpper(l))
+			levels = append(levels, l)
 		}
-		placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(args)), ", ")
-		return "upper(severity_text) IN (" + placeholders + ")", args, nil
+		return d.level(levels)
 	case "trace_id":
 		return "trace_id = ?", []any{t.value}, nil
 	default:

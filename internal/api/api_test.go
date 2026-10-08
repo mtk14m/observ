@@ -153,8 +153,8 @@ func TestLogHistogram(t *testing.T) {
 
 func TestTraces(t *testing.T) {
 	q := &fakeQuerier{}
-	code, _ := get(t, q, "/api/v1/traces?service=api&errors=true&min_duration_ms=250&limit=10")
-	want := query.TraceQuery{TimeRange: lastHour, Service: "api", ErrorsOnly: true,
+	code, _ := get(t, q, "/api/v1/traces?q=status:error&service=api&errors=true&min_duration_ms=250&limit=10")
+	want := query.TraceQuery{TimeRange: lastHour, Query: "status:error", Service: "api", ErrorsOnly: true,
 		MinDuration: 250 * time.Millisecond, Limit: 10}
 	if code != http.StatusOK || !reflect.DeepEqual(q.last, want) {
 		t.Errorf("status %d, query %+v, want %+v", code, q.last, want)
