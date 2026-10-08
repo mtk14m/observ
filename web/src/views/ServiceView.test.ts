@@ -42,9 +42,3 @@ test('shows the key numbers, charts, operations and dependencies', async () => {
   expect(w.find('a[href^="/services/payment"]').exists()).toBe(true)
   expect(w.find('a[href^="/services/frontend"]').exists()).toBe(true)
 })
-
-test('links to the traces and logs of the service', async () => {
-  const w = await render()
-  expect(w.find('a[href="/traces?from=now-1h&to=now&service=checkout"]').exists()).toBe(true)
-  expect(w.find('a[href="/logs?from=now-1h&to=now&q=service:checkout"]').exists()).toBe(true)
-})

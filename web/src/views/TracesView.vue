@@ -9,7 +9,11 @@ import { filters, removeFilter } from '@/lib/searchQuery'
 import StatusMessage from '@/components/StatusMessage.vue'
 import FacetChip from '@/components/FacetChip.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import ComparePanel from '@/components/ComparePanel.vue'
 import Val from '@/components/Val.vue'
+
+/** A query that always applies, hidden from the chips (e.g. a service hub). */
+const props = defineProps<{ scope?: string }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -25,7 +29,7 @@ const filtersFromUrl = computed<TraceFilters>(() => {
   const q = route.query
   const min = Number(q.min_ms)
   return {
-    q: typeof q.q === 'string' && q.q ? q.q : undefined,
+    q: [props.scope, typeof q.q === 'string' ? q.q : ''].filter(Boolean).join(' ') || undefined,
     service: typeof q.service === 'string' && q.service ? q.service : undefined,
     errors: q.errors === 'true' || undefined,
     minDurationMs: Number.isFinite(min) && min > 0 ? min : undefined,
@@ -38,8 +42,9 @@ function setFilter(key: string, value: string | undefined) {
 
 const loadServices = async () =>
   (await api.services(range.value)).map((s) => ({ value: s.name, count: s.requests }))
+const tab = computed(() => (route.query.tab === 'compare' ? 'compare' : 'list'))
 const traces = useQuery(
-  () => ({ range: { ...range.value }, filters: filtersFromUrl.value }),
+  () => (tab.value === 'list' ? { range: { ...range.value }, filters: filtersFromUrl.value } : null),
   ({ range, filters }) => api.traces(range, filters),
 )
 const longest = computed(() => Math.max(1, ...(traces.data.value ?? []).map((t) => t.duration_nano)))
@@ -99,8 +104,16 @@ const longest = computed(() => Math.max(1, ...(traces.data.value ?? []).map((t) 
     </section>
 
     <div class="tabs">
-      <span class="tab active">Traces <span class="count">{{ traces.data.value?.length ?? 0 }}</span></span>
+      <button type="button" class="tab" :class="{ active: tab === 'list' }" @click="setFilter('tab', undefined)">
+        Traces <span v-if="tab === 'list' && traces.data.value" class="count">{{ traces.data.value.length }}</span>
+      </button>
+      <button type="button" class="tab" :class="{ active: tab === 'compare' }" @click="setFilter('tab', 'compare')">
+        Compare <span class="count">errors</span>
+      </button>
     </div>
+
+    <ComparePanel v-if="tab === 'compare'" signal="spans" :range="range" :q="filtersFromUrl.q ?? ''" />
+    <template v-else>
 
     <StatusMessage v-if="traces.error.value" kind="error" title="Could not load traces" :detail="traces.error.value.message" />
     <StatusMessage
@@ -142,6 +155,7 @@ const longest = computed(() => Math.max(1, ...(traces.data.value ?? []).map((t) 
         </tr>
       </tbody>
     </table>
+    </template>
   </div>
 </template>
 

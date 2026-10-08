@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useTimeRange } from '@/composables/useTimeRange'
 import { useQuery } from '@/composables/useQuery'
 import { resolveNs } from '@/composables/useResolvedRange'
@@ -9,16 +9,31 @@ import { formatMs, formatPercent, formatRate } from '@/lib/format'
 import { absolute } from '@/lib/timeRange'
 import TimeSeriesChart from '@/components/charts/TimeSeriesChart.vue'
 import StatTile from '@/components/StatTile.vue'
-import AppIcon from '@/components/AppIcon.vue'
+import LogsView from './LogsView.vue'
+import TracesView from './TracesView.vue'
+import IssuesView from './IssuesView.vue'
 import StatusMessage from '@/components/StatusMessage.vue'
 
 const route = useRoute()
+const router = useRouter()
+type View = 'overview' | 'traces' | 'logs' | 'issues'
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'traces', label: 'Traces' },
+  { id: 'logs', label: 'Logs' },
+  { id: 'issues', label: 'Issues' },
+]
+const view = computed<View>(() => (VIEWS.some((v) => v.id === route.query.view) ? (route.query.view as View) : 'overview'))
+function setView(v: View) {
+  // Filters belong to one view: switching starts afresh, keeping the period.
+  void router.push({ query: { ...query.value, view: v === 'overview' ? undefined : v } })
+}
 const { range, query, setRange } = useTimeRange()
 const zoom = (r: { from: number; to: number }) => setRange(absolute(r.from, r.to))
 const name = computed(() => String(route.params.name))
 
 const detail = useQuery(
-  () => ({ range: { ...range.value }, name: name.value }),
+  () => (view.value === 'overview' ? { range: { ...range.value }, name: name.value } : null),
   async ({ range, name }) => ({ ...(await api.service(range, name)), ...resolveNs(range) }),
 )
 
@@ -39,16 +54,18 @@ const latency = computed(() =>
     points: (d.value?.timeline ?? []).map((p) => ({ t: p.t, v: p[`${q}_ms`] })),
   })),
 )
-const tracesLink = computed(() => ({ path: '/traces', query: { ...query.value, service: name.value } }))
-const logsLink = computed(() => ({ path: '/logs', query: { ...query.value, q: `service:${name.value}` } }))
 </script>
 
 <template>
-  <div class="page" :class="{ loading: detail.loading.value }">
-    <nav class="actions">
-      <RouterLink :to="tracesLink" class="btn">View traces <AppIcon name="external" :size="14" /></RouterLink>
-      <RouterLink :to="logsLink" class="btn">View logs <AppIcon name="external" :size="14" /></RouterLink>
-    </nav>
+  <div class="tabs hub-tabs">
+    <button v-for="v in VIEWS" :key="v.id" type="button" class="tab" :class="{ active: view === v.id }" @click="setView(v.id)">
+      {{ v.label }}
+    </button>
+  </div>
+  <TracesView v-if="view === 'traces'" :scope="`service:${name}`" />
+  <LogsView v-else-if="view === 'logs'" :scope="`service:${name}`" />
+  <IssuesView v-else-if="view === 'issues'" :service="name" />
+  <div v-else class="page overview" :class="{ loading: detail.loading.value }">
 
     <StatusMessage v-if="detail.error.value" kind="error" title="Could not load the service" :detail="detail.error.value.message" />
 
@@ -120,6 +137,9 @@ const logsLink = computed(() => ({ path: '/logs', query: { ...query.value, q: `s
 </template>
 
 <style scoped>
+.hub-tabs {
+  padding: 0 var(--space-5);
+}
 .actions {
   display: flex;
   justify-content: flex-end;

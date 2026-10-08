@@ -12,10 +12,16 @@ import StatusMessage from '@/components/StatusMessage.vue'
 import Val from '@/components/Val.vue'
 import AppIcon from '@/components/AppIcon.vue'
 
+/** Only list the issues of this service (service hub). */
+const props = defineProps<{ service?: string }>()
+
 const route = useRoute()
 const router = useRouter()
 const { range, query } = useTimeRange()
-const issues = useQuery(() => ({ ...range.value }), (r) => api.issues(r))
+const issues = useQuery(
+  () => ({ range: { ...range.value }, service: props.service }),
+  async ({ range, service }) => (await api.issues(range)).filter((i) => !service || i.service === service),
+)
 
 const selected = computed(() => issues.data.value?.find((i) => i.id === route.query.issue))
 const links = computed(() => (selected.value ? issueLinks(selected.value) : null))

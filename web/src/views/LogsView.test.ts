@@ -6,7 +6,7 @@ import LogsView from './LogsView.vue'
 
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
-  api: { logs: vi.fn(), logHistogram: vi.fn(), logFacet: vi.fn() },
+  api: { logs: vi.fn(), logHistogram: vi.fn(), logFacet: vi.fn(), compare: vi.fn() },
 }))
 
 const record: LogRecord = {
@@ -86,4 +86,16 @@ test('shows the number of matching logs and level pills', async () => {
   await flushPromises()
   expect(w.find('.tab.active').text()).toContain('7')
   expect(w.find('tbody .pill.error').text()).toBe('Error')
+})
+
+test('in the Compare tab, dragging on the chart selects a period to compare', async () => {
+  vi.mocked(api.compare).mockResolvedValue({ selection_total: 1, baseline_total: 1, items: [] })
+  vi.mocked(api.logHistogram).mockResolvedValue([{ t: 0, counts: { INFO: 1 } }])
+  const { w, router } = await render('/logs?tab=compare')
+  expect(w.find('.compare').exists()).toBe(true)
+  w.findComponent({ name: 'StackedBars' }).vm.$emit('zoom', { from: 1e18, to: 1e18 + 6e10 })
+  await flushPromises()
+  const q = router.currentRoute.value.query
+  expect(q.sel_from).toBe(new Date(1e12).toISOString())
+  expect(q.from).toBeUndefined() // the global range did not change
 })

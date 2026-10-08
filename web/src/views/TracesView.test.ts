@@ -6,7 +6,7 @@ import TracesView from './TracesView.vue'
 
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
-  api: { traces: vi.fn(), services: vi.fn() },
+  api: { traces: vi.fn(), services: vi.fn(), compare: vi.fn() },
 }))
 
 async function render(path: string) {
@@ -68,4 +68,17 @@ test('searches spans with the query syntax', async () => {
   expect(api.traces).toHaveBeenLastCalledWith({ from: 'now-1h', to: 'now' },
     { q: 'payment.issuer:acme-bank', service: undefined, errors: undefined, minDurationMs: undefined })
   expect(w.find('.active-filter').text()).toContain('acme-bank')
+})
+
+test('the Compare tab explains what failing traces have in common', async () => {
+  vi.mocked(api.compare).mockResolvedValue({ selection_total: 3, baseline_total: 9,
+    items: [{ key: 'payment.issuer', value: 'acme-bank', selection: 1, baseline: 0.2 }] })
+  const { w, router } = await render('/traces?q=service:checkout')
+  await w.findAll('.tab').find((t) => t.text().startsWith('Compare'))!.trigger('click')
+  await flushPromises()
+  expect(router.currentRoute.value.query.tab).toBe('compare')
+  expect(api.compare).toHaveBeenLastCalledWith({ from: 'now-1h', to: 'now' },
+    expect.objectContaining({ signal: 'spans', q: 'service:checkout', errors: true }))
+  expect(w.find('.compare').text()).toContain('acme-bank')
+  expect(w.find('table').exists()).toBe(false)
 })

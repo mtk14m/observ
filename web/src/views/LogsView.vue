@@ -15,6 +15,7 @@ import StatusMessage from '@/components/StatusMessage.vue'
 import LevelPill from '@/components/LevelPill.vue'
 import FacetChip from '@/components/FacetChip.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import ComparePanel from '@/components/ComparePanel.vue'
 import Val from '@/components/Val.vue'
 
 const LIMIT = 200
@@ -25,28 +26,47 @@ const FACETS = [
   { key: 'deployment.environment.name', label: 'environment', term: 'deployment.environment.name' },
 ]
 
+/** A query that always applies, hidden from the chips (e.g. a service hub). */
+const props = defineProps<{ scope?: string }>()
+
 const route = useRoute()
 const router = useRouter()
 const { range, setRange } = useTimeRange()
-const zoom = (r: { from: number; to: number }) => setRange(absolute(r.from, r.to))
+const tab = computed(() => (route.query.tab === 'compare' ? 'compare' : 'list'))
+function setTab(t: 'list' | 'compare') {
+  const { sel_from: _f, sel_to: _t, ...rest } = route.query
+  void router.push({ query: { ...rest, tab: t === 'compare' ? 'compare' : undefined } })
+}
+// In the Compare tab, dragging on the chart selects the period to compare.
+const selection = computed(() =>
+  typeof route.query.sel_from === 'string' && typeof route.query.sel_to === 'string'
+    ? { from: route.query.sel_from, to: route.query.sel_to }
+    : undefined,
+)
+function zoom(r: { from: number; to: number }) {
+  const abs = absolute(r.from, r.to)
+  if (tab.value === 'compare') void router.push({ query: { ...route.query, sel_from: abs.from, sel_to: abs.to } })
+  else void setRange(abs)
+}
 
 const q = computed(() => (typeof route.query.q === 'string' ? route.query.q : ''))
 const draft = ref(q.value)
 watch(q, (v) => (draft.value = v))
 const active = computed(() => filters(q.value))
+const effective = computed(() => [props.scope, q.value].filter(Boolean).join(' '))
 
 function setQuery(next: string) {
   void router.push({ query: { ...route.query, q: next || undefined } })
 }
 const search = () => setQuery(draft.value)
 
-const loadFacet = (key: string) => api.logFacet(range.value, q.value, key)
+const loadFacet = (key: string) => api.logFacet(range.value, effective.value, key)
 function pickFacet(f: (typeof FACETS)[number], value: string) {
   setQuery(addFilter(q.value, f.term, f.key === 'level' ? value.toLowerCase() : value))
 }
 
 const result = useQuery(
-  () => ({ range: { ...range.value }, q: q.value }),
+  () => ({ range: { ...range.value }, q: effective.value }),
   async ({ range, q }) => {
     const bounds = resolveNs(range)
     const [logs, histogram] = await Promise.all([api.logs(range, q, LIMIT), api.logHistogram(range, q)])
@@ -105,8 +125,17 @@ const selected = ref<LogRecord | null>(null)
       </section>
 
       <div class="tabs">
-        <button type="button" class="tab active">All logs <span class="count">{{ formatCompact(total) }}</span></button>
+        <button type="button" class="tab" :class="{ active: tab === 'list' }" @click="setTab('list')">
+          All logs <span class="count">{{ formatCompact(total) }}</span>
+        </button>
+        <button type="button" class="tab" :class="{ active: tab === 'compare' }" @click="setTab('compare')">
+          Compare <span class="count">{{ selection ? 'selected period' : 'errors' }}</span>
+        </button>
+        <span v-if="tab === 'compare' && !selection" class="hint muted">Tip: drag across the chart to compare a period instead.</span>
       </div>
+
+      <ComparePanel v-if="tab === 'compare'" signal="logs" :range="range" :q="effective" :selection="selection" />
+      <template v-else>
 
       <StatusMessage
         v-if="result.data.value.logs.length === 0"
@@ -141,6 +170,7 @@ const selected = ref<LogRecord | null>(null)
       <p v-if="result.data.value.logs.length === LIMIT" class="muted more">
         Showing the {{ LIMIT }} most recent records. Narrow the search or the time range to see older ones.
       </p>
+      </template>
     </template>
 
     <SidePanel v-if="selected" :title="`${selected.service} · ${formatDateTime(selected.time)}`" @close="selected = null">
@@ -203,7 +233,12 @@ const selected = ref<LogRecord | null>(null)
   border-bottom: 1px solid var(--border);
 }
 .tabs {
+  align-items: center;
   padding: 0 var(--space-5);
+}
+.hint {
+  margin-left: auto;
+  font-size: 12px;
 }
 .table th:first-child,
 .table td:first-child {
