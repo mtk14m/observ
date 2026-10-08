@@ -63,7 +63,8 @@ func TestIssues(t *testing.T) {
 	byKind := map[string]query.Issue{}
 	for _, is := range issues {
 		byKind[is.Kind] = is
-		if is.Status != "new" || is.Count != 1 || is.PreviousCount != 0 || len(is.Buckets) != 6 || is.ID == "" {
+		// The fixture has no data before the window: nothing is called new.
+		if is.Status != "ongoing" || is.Count != 1 || is.PreviousCount != 0 || len(is.Buckets) != 6 || is.ID == "" {
 			t.Errorf("issue = %+v", is)
 		}
 	}
@@ -117,5 +118,83 @@ func TestDeployments(t *testing.T) {
 	want := query.Deployment{Service: "checkout", Version: "1.4.2", Previous: "1.4.1", At: base.Add(10 * time.Minute).UnixNano()}
 	if len(got) != 1 || got[0] != want {
 		t.Errorf("deployments = %+v, want %+v", got, want)
+	}
+}
+
+// errorChain writes, at +offset, a trace where an error propagates from
+// payment (origin) to checkout and frontend.
+func errorChain(t *testing.T, p *ingest.Pipeline, tid byte, offset time.Duration) {
+	t.Helper()
+	td := ptrace.NewTraces()
+	chain := []string{"frontend", "checkout", "payment"}
+	for i, svc := range chain {
+		rs := td.ResourceSpans().AppendEmpty()
+		rs.Resource().Attributes().PutStr("service.name", svc)
+		s := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+		s.SetTraceID(pcommon.TraceID{tid})
+		s.SetSpanID(pcommon.SpanID{byte(i + 1)})
+		if i > 0 {
+			s.SetParentSpanID(pcommon.SpanID{byte(i)})
+		}
+		s.SetName("call " + svc)
+		s.SetStartTimestamp(pcommon.NewTimestampFromTime(base.Add(offset)))
+		s.SetEndTimestamp(pcommon.NewTimestampFromTime(base.Add(offset + time.Millisecond)))
+		s.Status().SetCode(ptrace.StatusCodeError)
+	}
+	if err := p.ConsumeTraces(t.Context(), td); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insightsEngine(t *testing.T, write func(p *ingest.Pipeline)) *query.Engine {
+	t.Helper()
+	store, _ := fs.New(t.TempDir())
+	p, err := ingest.New(ingest.Options{WALDir: t.TempDir(), Store: store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = p.Close() }()
+	write(p)
+	if err := p.Flush(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	e, _ := query.New(store)
+	t.Cleanup(func() { _ = e.Close() })
+	return e
+}
+
+func TestIssuesKeepOnlyTheOriginOfPropagatedErrors(t *testing.T) {
+	e := insightsEngine(t, func(p *ingest.Pipeline) { errorChain(t, p, 1, 10*time.Minute) })
+	issues, err := e.Issues(t.Context(), window, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 || issues[0].Service != "payment" || issues[0].Title != "call payment" {
+		t.Errorf("issues = %+v, want only the payment span where the error started", issues)
+	}
+}
+
+func TestIssuesDoNotClaimNewWithoutHistory(t *testing.T) {
+	// No data at all in the previous period: nothing can be called new.
+	e := insightsEngine(t, func(p *ingest.Pipeline) { errorChain(t, p, 1, 10*time.Minute) })
+	issues, _ := e.Issues(t.Context(), window, 6)
+	if issues[0].Status != "ongoing" {
+		t.Errorf("status = %q, want ongoing when there is no history", issues[0].Status)
+	}
+
+	// With history, an error absent from the previous period is new.
+	e = insightsEngine(t, func(p *ingest.Pipeline) {
+		td := ptrace.NewTraces()
+		rs := td.ResourceSpans().AppendEmpty()
+		rs.Resource().Attributes().PutStr("service.name", "frontend")
+		s := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+		s.SetStartTimestamp(pcommon.NewTimestampFromTime(base.Add(-30 * time.Minute)))
+		s.SetEndTimestamp(pcommon.NewTimestampFromTime(base.Add(-30 * time.Minute)))
+		_ = p.ConsumeTraces(t.Context(), td)
+		errorChain(t, p, 1, 10*time.Minute)
+	})
+	issues, _ = e.Issues(t.Context(), window, 6)
+	if issues[0].Status != "new" {
+		t.Errorf("status = %q, want new", issues[0].Status)
 	}
 }

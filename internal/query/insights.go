@@ -179,7 +179,8 @@ type Issue struct {
 	FirstSeen     int64  `json:"first_seen"`
 	LastSeen      int64  `json:"last_seen"`
 	// Status is "new" (absent from the previous period), "rising" (at
-	// least twice as frequent) or "ongoing".
+	// least twice as frequent) or "ongoing" (also used when the previous
+	// period has no data at all to compare with).
 	Status         string  `json:"status"`
 	Buckets        []int64 `json:"buckets"`
 	ExampleTraceID string  `json:"example_trace_id"`
@@ -192,7 +193,7 @@ var variableParts = regexp.MustCompile(`[0-9a-fA-F]{8,}|\d+(?:\.\d+)?`)
 func Template(message string) string { return variableParts.ReplaceAllString(message, "<*>") }
 
 // Issues groups the errors of r into issues, compared with the period of the
-// same length just before.
+// same length just before. For spans, only the origin of an error counts.
 func (e *Engine) Issues(ctx context.Context, r TimeRange, buckets int) ([]Issue, error) {
 	if buckets <= 0 {
 		buckets = 24
@@ -203,18 +204,34 @@ func (e *Engine) Issues(ctx context.Context, r TimeRange, buckets int) ([]Issue,
 	prevFrom := prev.From.UnixNano()
 
 	issues := map[string]*Issue{}
-	add := func(kind, dir, timeCol, errExpr, titleExpr string) error {
+	history := map[string]bool{} // per kind: were there records in the previous period?
+	// origin keeps only the spans where an error started: spans in error
+	// none of whose children is in error. Without it, one failure would show
+	// up as an issue in every service it propagated through.
+	add := func(kind, dir, timeCol, errExpr, titleExpr string, origin bool) error {
 		paths, err := e.files(ctx, dir, prev)
 		if err != nil || len(paths) == 0 {
 			return err
 		}
+		src := source(paths)
+		var before int64
+		if err := e.db.QueryRowContext(ctx, `SELECT count(*) FROM `+src+` WHERE `+timeCol+` >= ? AND `+timeCol+` < ?`,
+			prevFrom, from).Scan(&before); err != nil {
+			return fmt.Errorf("query: issues: %w", err)
+		}
+		history[kind] = before > 0
+
+		originFilter := ""
+		if origin {
+			originFilter = ` WHERE NOT EXISTS (SELECT 1 FROM e c WHERE c.trace_id = e.trace_id AND c.parent_span_id = e.span_id)`
+		}
 		rows, err := e.db.QueryContext(ctx, `
+			WITH e AS (SELECT * FROM `+src+` WHERE `+timeCol+` >= ? AND `+timeCol+` < ? AND `+errExpr+`)
 			SELECT service_name, `+titleExpr+` AS title,
 			       CASE WHEN `+timeCol+` >= ? THEN (`+timeCol+` - ?) // ? ELSE -1 END AS bucket,
 			       count(*), min(`+timeCol+`), max(`+timeCol+`), arg_max(`+titleExpr+`, `+timeCol+`), arg_max(trace_id, `+timeCol+`)
-			FROM `+source(paths)+`
-			WHERE `+timeCol+` >= ? AND `+timeCol+` < ? AND `+errExpr+`
-			GROUP BY ALL`, from, from, step, prevFrom, to)
+			FROM e`+originFilter+`
+			GROUP BY ALL`, prevFrom, to, from, from, step)
 		if err != nil {
 			return fmt.Errorf("query: issues: %w", err)
 		}
@@ -253,11 +270,11 @@ func (e *Engine) Issues(ctx context.Context, r TimeRange, buckets int) ([]Issue,
 		}
 		return rows.Err()
 	}
-	if err := add("log", layout.Logs, "time_unix_nano", "upper(severity_text) IN ('ERROR', 'FATAL')", "body"); err != nil {
+	if err := add("log", layout.Logs, "time_unix_nano", "upper(severity_text) IN ('ERROR', 'FATAL')", "body", false); err != nil {
 		return nil, err
 	}
 	if err := add("span", layout.Spans, "start_time_unix_nano", "status_code = 'Error'",
-		"CASE WHEN status_message = '' THEN name ELSE name || ': ' || status_message END"); err != nil {
+		"CASE WHEN status_message = '' THEN name ELSE name || ': ' || status_message END", true); err != nil {
 		return nil, err
 	}
 
@@ -267,6 +284,8 @@ func (e *Engine) Issues(ctx context.Context, r TimeRange, buckets int) ([]Issue,
 			continue
 		}
 		switch {
+		case !history[is.Kind]:
+			is.Status = "ongoing" // no data before: nothing can be called new
 		case is.PreviousCount == 0:
 			is.Status = "new"
 		case is.Count >= 2*is.PreviousCount:
