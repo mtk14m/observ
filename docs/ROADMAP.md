@@ -26,6 +26,10 @@ groupe, avec délai de confirmation, notifications Slack et webhook, page Alerte
 L'authentification aussi : comptes locaux, sessions, rôles admin/membre, jeton d'ingestion OTLP.
 Reste pour la phase 2 : la connexion OIDC (SSO), les dashboards et la mesure auprès d'équipes pilotes.
 
+L'UI de diagnostic de `UX.md` est livrée (Home, Issues, Compare, hub service, menu de valeur,
+zoom au glisser, palette de commandes). Sur le game day de la démo, on trouve la cause en 3 clics
+et sans requête, contre environ 9 clics avant.
+
 ## Phase 0 — Valider les choix risqués (3–4 semaines)
 
 - Pipeline minimal pour les 3 signaux : OTLP → pdata → WAL → Arrow → Parquet → disque local.

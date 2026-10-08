@@ -26,8 +26,8 @@
 </p>
 
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/services-light.png">
-  <img src="docs/images/services.png" alt="The obsrv Services page: a service map of frontend, checkout, inventory and payment, and a table of request rates, error rates and latency percentiles">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/home-light.png">
+  <img src="docs/images/home.png" alt="The obsrv Home page: checkout and payment are red because their latency rose sixfold, two alerts are firing, and new or rising issues are listed">
 </picture>
 
 > [!WARNING]
@@ -51,22 +51,52 @@
 
 ## A quick tour
 
+### Know what is wrong as soon as you arrive
+
+*Home* compares every service with the previous period and says why it needs attention: more
+errors, slower requests. Firing alerts and new or rising issues sit next to it.
+
+### See errors as a short list of problems
+
+*Issues* groups errors by message, keeps only the spans where an error starts, and tells whether
+each problem is new or rising.
+
+![The Issues page with the card declines of the payment service opened in a side panel](docs/images/issues.png)
+
+### Find what errors have in common, without a query
+
+*Compare* shows which attributes are over-represented in errors, or in a period you drag across a
+chart. Here, most failing payments go through one bank, `acme-bank`. Click any value to filter on
+it, exclude it, or open its logs or traces.
+
+![The Compare tab: payment.issuer acme-bank and HTTP status 503 are over-represented in spans in error, with the value menu open](docs/images/compare.png)
+
+### Go anywhere from the keyboard
+
+`Ctrl/⌘ K` opens a page, a service, a metric or a trace ID. `/` focuses search, `[` and `]` move the time range.
+
+![The command palette listing the pages of obsrv](docs/images/palette.png)
+
 ### Follow a request across services
 
 The waterfall shows where the time went and where it failed. The logs of the trace are listed under it.
 
 ![A trace waterfall: the payment service was slow and then refused the card, so checkout failed](docs/images/trace.png)
 
-### See every service at a glance
+### See every signal of a service in one place
 
-Each service has its own page: request rate, error rate and latency over time, its operations, and
-the services it calls or is called by.
+Each service has its own page: request rate, error rate and latency over time, its operations, the
+services it calls or is called by, and tabs with its traces, logs and issues. The *Services* page
+draws the map of who calls whom.
+
+![The Services page: a service map of frontend, checkout, inventory and payment, and a table of request rates, error rates and latency percentiles](docs/images/services.png)
 
 ![The checkout service page with request, error rate and latency charts, operations and dependencies](docs/images/service.png)
 
 ### Search logs
 
-Search with a short syntax, see the volume by severity, and open any line to see its attributes and its trace.
+Search with a short syntax, see the volume by severity, drag across the chart to zoom, and open any
+line to see its attributes and its trace.
 
 ![The logs page with a volume histogram by severity and a list of log records](docs/images/logs.png)
 

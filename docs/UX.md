@@ -46,6 +46,20 @@ Notre [DESIGN.md](DESIGN.md) promet déjà plusieurs de ces principes, mais **l'
 
 Le constat : **l'apparence est bonne, le parcours ne l'est pas encore.** On a une belle interface de consultation, pas encore une interface de diagnostic.
 
+**Mise à jour du 2026-10-09, après les 5 étapes du plan (§7) :**
+
+| Promesse ou leçon | État |
+|---|---|
+| « Everything is clickable » | ✅ Menu de valeur sur les services, niveaux, attributs, valeurs de Compare et d'Issues |
+| « Dragging across a chart zooms » | ✅ Sur les graphiques de séries et l'histogramme des logs |
+| « Keyboard first » | 🟡 Cmd+K, `/`, `[` et `]` ; `j`/`k` dans les listes reste à faire |
+| Vue d'ensemble « feu tricolore » | ✅ Home : santé par service, comparée à la période précédente, avec la raison |
+| Expliquer ce qui diffère | ✅ Onglet Compare dans les explorateurs de logs et de traces |
+| Regrouper les erreurs | ✅ Page Issues : empreinte des messages, origine des erreurs de spans, statut New / Rising |
+| Une ressource, tous ses signaux | ✅ La page service est un hub : Overview, Traces, Logs, Issues |
+| Explorer sans écrire de requête | 🟡 Plus de requête dans le parcours de diagnostic ; la liste des métriques reste brute |
+| Bascule entre signaux | ✅ « View logs / traces with this value » depuis n'importe quelle valeur |
+
 ## 4. Notre thèse : une UI de diagnostic, pas un catalogue de données
 
 > **obsrv répond à « qu'est-ce qui ne va pas, et pourquoi ? » en moins de 5 clics, sans écrire une requête.**
@@ -135,6 +149,19 @@ Le scénario de la démo est le suivant : la banque de paiement ralentit et refu
 |---|---|---|
 | Clics jusqu'à la cause | ~9 (Services → service → Traces → filtre erreur → trace → span → retour → Logs → recherche) | **≤ 4** (Home → issue → Compare → trace) |
 | Requête à écrire | 1 (`service:payment level:error`) | **0** |
+
+**Résultat du game day rejoué le 2026-10-09 sur la démo :**
+
+1. **Home** : « 3 services need attention » ; *payment* est rouge (« p95 ×6 vs previous period ») et
+   l'issue « charge card: card declined by issuer » est listée comme *Rising*. **Clic 1** sur l'issue.
+2. **Issues** : le panneau montre le volume, la période précédente et un exemple.
+   **Clic 2** sur « What do errors have in common? ».
+3. **Compare** (traces de *payment*, erreurs contre le reste) : `payment.issuer = acme-bank` est
+   présent dans 44 à 72 % des spans en erreur contre 16 à 25 % ailleurs, et `http.response.status_code = 503`
+   dans 22 % contre 0 %. La cause est lisible **sans clic de plus**.
+4. Optionnel, **clic 3** : le menu de valeur sur `acme-bank` filtre les traces ou ouvre les logs de cette banque.
+
+**3 clics, 0 requête** contre environ 9 clics et 1 requête avant : la cible (≤ 4) est atteinte.
 
 ## 7. Plan de construction proposé
 

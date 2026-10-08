@@ -39,6 +39,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `-ingest-token` requires OTLP clients to send `Authorization: Bearer <token>`.
 - Redesigned interface: icon rail, light and dark themes, search-first logs explorer with facets,
   collapsible trace waterfall.
+- Diagnostic UX (see `docs/UX.md`):
+  - *Home* page: health of every service compared with the previous period, with the reason,
+    firing alerts, new or rising issues and deployments.
+  - *Issues* page: errors grouped by message template, only where span errors start, with their
+    trend and a *New* / *Rising* / *Ongoing* status.
+  - *Compare* tab in the logs and traces explorers: the attributes over-represented in errors or in
+    a time range dragged on the chart, compared with the rest.
+  - The service page becomes a hub with *Overview*, *Traces*, *Logs* and *Issues* tabs.
+  - A menu on every value: filter, exclude, open the logs or traces with this value, copy.
+  - Drag across a chart to zoom; `Ctrl/⌘ K` command palette, `/` to search, `[` and `]` to shift
+    the time range.
+  - Search syntax for spans in the traces explorer.
 
 ### Security
 

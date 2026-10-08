@@ -35,6 +35,11 @@ const traces = await (await fetch(`${BASE}/api/v1/traces?${RANGE}&errors=true&mi
 const trace = traces.data?.find((t) => t.span_count >= 9) ?? traces.data?.[0]
 if (!trace) throw new Error('no slow failing trace yet: let the demo run a few minutes')
 
+// And the card declines of the payment service for the Issues screenshot.
+const issues = await (await fetch(`${BASE}/api/v1/issues?${RANGE}`, auth)).json()
+const issue = issues.data?.find((i) => i.service === 'payment' && i.kind === 'span') ?? issues.data?.[0]
+if (!issue) throw new Error('no issue yet: let the demo run a few minutes')
+
 // 3. Start Chrome with remote debugging on a free port.
 const profile = mkdtempSync(join(tmpdir(), 'obsrv-shots-'))
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=0',
@@ -79,7 +84,8 @@ await page('Page.enable')
 await page('Network.enable')
 await page('Network.setCookie', { name: 'obsrv_session', value: session, url: BASE, httpOnly: true })
 
-async function shot(name, path, height, scheme = 'dark') {
+// act runs in the page before the capture, e.g. to open a menu.
+async function shot(name, path, height, { scheme = 'dark', act } = {}) {
   await page('Emulation.setDeviceMetricsOverride', { width: 1440, height, deviceScaleFactor: 2, mobile: false })
   await page('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] })
   const loaded = new Promise((resolve) => {
@@ -89,6 +95,11 @@ async function shot(name, path, height, scheme = 'dark') {
   await page('Page.navigate', { url: BASE + path })
   await loaded
   await sleep(2500) // let queries return and charts render
+  if (act) {
+    const { exceptionDetails } = await page('Runtime.evaluate', { expression: `(${act})()`, awaitPromise: true })
+    if (exceptionDetails) throw new Error(`${name}: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`)
+    await sleep(800)
+  }
   const { data } = await page('Page.captureScreenshot', { format: 'png' })
   writeFileSync(join(OUT, `${name}.png`), Buffer.from(data, 'base64'))
   console.log(`  ${OUT}/${name}.png`)
@@ -96,8 +107,19 @@ async function shot(name, path, height, scheme = 'dark') {
 
 console.log('Writing screenshots:')
 try {
+  await shot('home', `/?${RANGE}`, 820)
+  await shot('home-light', `/?${RANGE}`, 820, { scheme: 'light' })
+  await shot('issues', `/issues?${RANGE}&issue=${issue.id}`, 620)
+  await shot('compare', `/traces?${RANGE}&q=service:payment&tab=compare`, 700, {
+    act: () => {
+      const values = [...document.querySelectorAll('.compare .val')]
+      ;(values.find((v) => v.textContent.trim() === 'acme-bank') ?? values[0])?.click()
+    },
+  })
+  await shot('palette', `/?${RANGE}`, 620, {
+    act: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })),
+  })
   await shot('services', `/services?${RANGE}`, 620)
-  await shot('services-light', `/services?${RANGE}`, 620, 'light')
   await shot('service', `/services/checkout?${RANGE}`, 760)
   await shot('trace', `/traces/${trace.trace_id}`, 760)
   await shot('logs', `/logs?${RANGE}`, 760)
