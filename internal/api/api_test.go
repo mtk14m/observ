@@ -38,6 +38,21 @@ func (f *fakeQuerier) ServiceMap(_ context.Context, r query.TimeRange) ([]query.
 	return []query.Edge{{From: "a", To: "b", Requests: 2}}, f.err
 }
 
+func (f *fakeQuerier) Compare(_ context.Context, q query.CompareQuery) (query.CompareResult, error) {
+	f.last = q
+	return query.CompareResult{SelectionTotal: 1, Items: []query.CompareItem{{Key: "k", Value: "v", Selection: 1}}}, f.err
+}
+
+func (f *fakeQuerier) Issues(_ context.Context, r query.TimeRange, buckets int) ([]query.Issue, error) {
+	f.last = []any{r, buckets}
+	return []query.Issue{{ID: "i1", Title: "boom"}}, f.err
+}
+
+func (f *fakeQuerier) Deployments(_ context.Context, r query.TimeRange) ([]query.Deployment, error) {
+	f.last = r
+	return []query.Deployment{{Service: "a", Version: "2"}}, f.err
+}
+
 func (f *fakeQuerier) SearchLogs(_ context.Context, q query.LogQuery) ([]query.LogRecord, error) {
 	f.last = q
 	if q.Query == `"bad` {
@@ -264,5 +279,38 @@ func TestLogFacet(t *testing.T) {
 	}
 	if code, _ := get(t, q, "/api/v1/logs/facets"); code != http.StatusBadRequest {
 		t.Errorf("missing key: %d, want 400", code)
+	}
+}
+
+func TestCompare(t *testing.T) {
+	q := &fakeQuerier{}
+	code, body := get(t, q, "/api/v1/compare?signal=spans&q=service:api&errors=true")
+	want := query.CompareQuery{TimeRange: lastHour, Signal: "spans", Query: "service:api", Errors: true}
+	if code != http.StatusOK || !reflect.DeepEqual(q.last, want) {
+		t.Errorf("errors mode: %d %+v, want %+v", code, q.last, want)
+	}
+	if body["data"].(map[string]any)["items"].([]any)[0].(map[string]any)["key"] != "k" {
+		t.Errorf("body = %v", body)
+	}
+
+	code, _ = get(t, q, "/api/v1/compare?signal=logs&sel_from=now-30m&sel_to=now-20m")
+	want = query.CompareQuery{TimeRange: lastHour, Signal: "logs",
+		Window: query.TimeRange{From: now.Add(-30 * time.Minute), To: now.Add(-20 * time.Minute)}}
+	if code != http.StatusOK || !reflect.DeepEqual(q.last, want) {
+		t.Errorf("window mode: %d %+v, want %+v", code, q.last, want)
+	}
+
+	if code, _ := get(t, q, "/api/v1/compare?signal=logs"); code != http.StatusBadRequest {
+		t.Errorf("no selection: %d, want 400", code)
+	}
+}
+
+func TestIssuesAndDeployments(t *testing.T) {
+	q := &fakeQuerier{}
+	if code, _ := get(t, q, "/api/v1/issues"); code != http.StatusOK || !reflect.DeepEqual(q.last, []any{lastHour, 24}) {
+		t.Errorf("issues: %d %+v", code, q.last)
+	}
+	if code, _ := get(t, q, "/api/v1/deployments"); code != http.StatusOK || !reflect.DeepEqual(q.last, lastHour) {
+		t.Errorf("deployments: %d %+v", code, q.last)
 	}
 }

@@ -25,6 +25,9 @@ type Querier interface {
 	Services(ctx context.Context, r query.TimeRange) ([]query.ServiceSummary, error)
 	ServiceDetail(ctx context.Context, name string, r query.TimeRange, step time.Duration) (query.ServiceDetail, error)
 	ServiceMap(ctx context.Context, r query.TimeRange) ([]query.Edge, error)
+	Compare(ctx context.Context, q query.CompareQuery) (query.CompareResult, error)
+	Issues(ctx context.Context, r query.TimeRange, buckets int) ([]query.Issue, error)
+	Deployments(ctx context.Context, r query.TimeRange) ([]query.Deployment, error)
 	SearchLogs(ctx context.Context, q query.LogQuery) ([]query.LogRecord, error)
 	LogHistogram(ctx context.Context, q query.LogQuery, step time.Duration) ([]query.HistogramBucket, error)
 	LogFacet(ctx context.Context, q query.LogQuery, key string, limit int) ([]query.FacetValue, error)
@@ -56,6 +59,9 @@ func NewHandler(q Querier, opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/services", h.services)
 	mux.HandleFunc("GET /api/v1/services/{name}", h.serviceDetail)
 	mux.HandleFunc("GET /api/v1/service-map", h.serviceMap)
+	mux.HandleFunc("GET /api/v1/compare", h.compare)
+	mux.HandleFunc("GET /api/v1/issues", h.issues)
+	mux.HandleFunc("GET /api/v1/deployments", h.deployments)
 	mux.HandleFunc("GET /api/v1/logs", h.logs)
 	mux.HandleFunc("GET /api/v1/logs/histogram", h.logHistogram)
 	mux.HandleFunc("GET /api/v1/logs/facets", h.logFacet)
@@ -110,6 +116,55 @@ func (h *handler) serviceMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := h.q.ServiceMap(r.Context(), tr)
+	write(w, data, err)
+}
+
+func (h *handler) compare(w http.ResponseWriter, r *http.Request) {
+	tr, err := h.timeRange(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	p := r.URL.Query()
+	q := query.CompareQuery{TimeRange: tr, Signal: p.Get("signal"), Query: p.Get("q"), Errors: p.Get("errors") == "true"}
+	if !q.Errors {
+		if p.Get("sel_from") == "" || p.Get("sel_to") == "" {
+			writeError(w, fmt.Errorf("%w: compare needs errors=true or a sel_from/sel_to window", errBadRequest))
+			return
+		}
+		from, err := ParseTime(p.Get("sel_from"), h.now())
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		to, err := ParseTime(p.Get("sel_to"), h.now())
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		q.Window = query.TimeRange{From: from, To: to}
+	}
+	data, err := h.q.Compare(r.Context(), q)
+	write(w, data, err)
+}
+
+func (h *handler) issues(w http.ResponseWriter, r *http.Request) {
+	tr, err := h.timeRange(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	data, err := h.q.Issues(r.Context(), tr, 24)
+	write(w, data, err)
+}
+
+func (h *handler) deployments(w http.ResponseWriter, r *http.Request) {
+	tr, err := h.timeRange(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	data, err := h.q.Deployments(r.Context(), tr)
 	write(w, data, err)
 }
 
