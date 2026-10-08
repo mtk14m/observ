@@ -71,7 +71,7 @@ test('Issues lists errors grouped, and a selected issue links to its records', a
   await flushPromises()
   const rows = w.findAll('tbody tr')
   expect(rows).toHaveLength(2)
-  expect(rows[0]!.text()).toContain('NEW')
+  expect(rows[0]!.text()).toContain('New')
   expect(rows[0]!.text()).toContain('payment refused')
   expect(rows[0]!.text()).toContain('42')
   expect(rows[0]!.findAll('.spark rect')).toHaveLength(4)

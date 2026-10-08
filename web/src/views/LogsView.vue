@@ -162,7 +162,7 @@ const selected = ref<LogRecord | null>(null)
           >
             <td class="mono muted">{{ formatTime(l.time) }}</td>
             <td><Val k="level" :v="l.severity"><LevelPill :level="l.severity" /></Val></td>
-            <td><Val k="service.name" :v="l.service" /></td>
+            <td class="service"><Val k="service.name" :v="l.service" /></td>
             <td class="mono truncate">{{ l.body }}</td>
           </tr>
         </tbody>
@@ -243,6 +243,10 @@ const selected = ref<LogRecord | null>(null)
 .table th:first-child,
 .table td:first-child {
   padding-left: var(--space-5);
+}
+.service {
+  min-width: 12ch;
+  white-space: nowrap;
 }
 .more {
   margin: var(--space-3) 0;

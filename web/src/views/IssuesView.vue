@@ -34,7 +34,7 @@ function close() {
   const { issue: _, ...rest } = route.query
   void router.push({ query: rest })
 }
-const STATUS = { new: { label: 'NEW', cls: 'error' }, rising: { label: 'RISING', cls: 'warn' }, ongoing: { label: 'ongoing', cls: 'debug' } }
+const STATUS = { new: { label: 'New', cls: 'error' }, rising: { label: 'Rising', cls: 'warn' }, ongoing: { label: 'Ongoing', cls: 'debug' } }
 </script>
 
 <template>

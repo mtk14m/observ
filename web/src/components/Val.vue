@@ -28,6 +28,8 @@ function open(e: MouseEvent) {
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 .val:hover {
   background: var(--accent-soft);
