@@ -125,8 +125,14 @@ func TestDeployments(t *testing.T) {
 // payment (origin) to checkout and frontend.
 func errorChain(t *testing.T, p *ingest.Pipeline, tid byte, offset time.Duration) {
 	t.Helper()
+	writeChain(t, p, tid, offset, []string{"frontend", "checkout", "payment"}, nil)
+}
+
+// writeChain writes a trace whose spans form a chain, all in error except
+// the indexes listed in ok.
+func writeChain(t *testing.T, p *ingest.Pipeline, tid byte, offset time.Duration, chain []string, ok map[int]bool) {
+	t.Helper()
 	td := ptrace.NewTraces()
-	chain := []string{"frontend", "checkout", "payment"}
 	for i, svc := range chain {
 		rs := td.ResourceSpans().AppendEmpty()
 		rs.Resource().Attributes().PutStr("service.name", svc)
@@ -139,7 +145,9 @@ func errorChain(t *testing.T, p *ingest.Pipeline, tid byte, offset time.Duration
 		s.SetName("call " + svc)
 		s.SetStartTimestamp(pcommon.NewTimestampFromTime(base.Add(offset)))
 		s.SetEndTimestamp(pcommon.NewTimestampFromTime(base.Add(offset + time.Millisecond)))
-		s.Status().SetCode(ptrace.StatusCodeError)
+		if !ok[i] {
+			s.Status().SetCode(ptrace.StatusCodeError)
+		}
 	}
 	if err := p.ConsumeTraces(t.Context(), td); err != nil {
 		t.Fatal(err)
@@ -196,5 +204,20 @@ func TestIssuesDoNotClaimNewWithoutHistory(t *testing.T) {
 	issues, _ = e.Issues(t.Context(), window, 6)
 	if issues[0].Status != "new" {
 		t.Errorf("status = %q, want new", issues[0].Status)
+	}
+}
+
+func TestIssuesFindTheOriginThroughSpansThatAreNotInError(t *testing.T) {
+	// An HTTP 4xx is not an error on the server span, so the chain of errors
+	// is broken: frontend ✗ → checkout client ✗ → payment server ✓ → charge card ✗.
+	e := insightsEngine(t, func(p *ingest.Pipeline) {
+		writeChain(t, p, 1, 10*time.Minute, []string{"frontend", "checkout", "payment", "payment"}, map[int]bool{2: true})
+	})
+	issues, err := e.Issues(t.Context(), window, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 1 || issues[0].Title != "call payment" {
+		t.Errorf("issues = %+v, want only the deepest span in error", issues)
 	}
 }

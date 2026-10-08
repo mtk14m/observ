@@ -206,8 +206,10 @@ func (e *Engine) Issues(ctx context.Context, r TimeRange, buckets int) ([]Issue,
 	issues := map[string]*Issue{}
 	history := map[string]bool{} // per kind: were there records in the previous period?
 	// origin keeps only the spans where an error started: spans in error
-	// none of whose children is in error. Without it, one failure would show
-	// up as an issue in every service it propagated through.
+	// with no descendant in error, at any depth (a server span answering
+	// 4xx is not in error, yet the error went through it). Without it, one
+	// failure would show up as an issue in every service it propagated
+	// through.
 	add := func(kind, dir, timeCol, errExpr, titleExpr string, origin bool) error {
 		paths, err := e.files(ctx, dir, prev)
 		if err != nil || len(paths) == 0 {
@@ -221,17 +223,31 @@ func (e *Engine) Issues(ctx context.Context, r TimeRange, buckets int) ([]Issue,
 		}
 		history[kind] = before > 0
 
-		originFilter := ""
+		originFilter, withAll := "", ""
+		args := []any{prevFrom, to}
 		if origin {
-			originFilter = ` WHERE NOT EXISTS (SELECT 1 FROM e c WHERE c.trace_id = e.trace_id AND c.parent_span_id = e.span_id)`
+			// up walks from each span in error to its ancestors.
+			withAll = `all_spans AS (SELECT trace_id, span_id, parent_span_id FROM ` + src + `
+				WHERE ` + timeCol + ` >= ? AND ` + timeCol + ` < ?),
+			up AS (
+				SELECT trace_id, parent_span_id AS ancestor FROM e WHERE parent_span_id <> ''
+				UNION
+				SELECT a.trace_id, a.parent_span_id FROM up JOIN all_spans a
+					ON a.trace_id = up.trace_id AND a.span_id = up.ancestor
+				WHERE a.parent_span_id <> ''
+			),`
+			originFilter = ` WHERE NOT EXISTS (SELECT 1 FROM up WHERE up.trace_id = e.trace_id AND up.ancestor = e.span_id)`
+			args = append(args, prevFrom, to)
 		}
+		args = append(args, from, from, step)
 		rows, err := e.db.QueryContext(ctx, `
-			WITH e AS (SELECT * FROM `+src+` WHERE `+timeCol+` >= ? AND `+timeCol+` < ? AND `+errExpr+`)
+			WITH RECURSIVE e AS (SELECT * FROM `+src+` WHERE `+timeCol+` >= ? AND `+timeCol+` < ? AND `+errExpr+`),
+			`+withAll+` _ AS (SELECT 1)
 			SELECT service_name, `+titleExpr+` AS title,
 			       CASE WHEN `+timeCol+` >= ? THEN (`+timeCol+` - ?) // ? ELSE -1 END AS bucket,
 			       count(*), min(`+timeCol+`), max(`+timeCol+`), arg_max(`+titleExpr+`, `+timeCol+`), arg_max(trace_id, `+timeCol+`)
 			FROM e`+originFilter+`
-			GROUP BY ALL`, prevFrom, to, from, from, step)
+			GROUP BY ALL`, args...)
 		if err != nil {
 			return fmt.Errorf("query: issues: %w", err)
 		}
