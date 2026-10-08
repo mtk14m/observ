@@ -22,8 +22,9 @@ dédupliquées, la décision sur les IDs binaires, la mesure sur la démo OpenTe
 la comparaison avec OpenObserve et SigNoz.
 
 L'alerting de la phase 2 est en place : règles sur des comptages de logs ou des métriques, par
-groupe, avec délai de confirmation, notifications Slack et webhook, page Alertes. Reste pour la
-phase 2 : l'authentification, les dashboards et la mesure auprès d'équipes pilotes.
+groupe, avec délai de confirmation, notifications Slack et webhook, page Alertes.
+L'authentification aussi : comptes locaux, sessions, rôles admin/membre, jeton d'ingestion OTLP.
+Reste pour la phase 2 : la connexion OIDC (SSO), les dashboards et la mesure auprès d'équipes pilotes.
 
 ## Phase 0 — Valider les choix risqués (3–4 semaines)
 

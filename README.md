@@ -93,7 +93,8 @@ from time to time and sometimes refuses cards, so there is something to investig
 make demo        # or: docker compose -f deploy/demo/docker-compose.yml up --build -d
 ```
 
-Open <http://localhost:8080>. Data appears within seconds. Things to try:
+Open <http://localhost:8080> and sign in with **`admin@obsrv.local`** / **`obsrv-demo-password`**.
+Data appears within seconds. Things to try:
 
 1. **Services**: checkout has about 10% errors. Click it.
 2. **Traces**: tick *Errors only* and open a trace. The payment call failed, and its logs are under the waterfall.
@@ -112,11 +113,26 @@ Stop and delete everything with `make demo-down`.
 
 ## Send your own telemetry
 
-Run obsrv from source (`make run`) or with Docker, then point any OpenTelemetry SDK or Collector at it:
+Run obsrv from source (`make run`) or with Docker. On first start, open the UI: it asks you to create
+the administrator account. Then point any OpenTelemetry SDK or Collector at obsrv:
 
 ```sh
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # OTLP/HTTP, or :4317 for OTLP/gRPC
 ```
+
+### Secure it
+
+- **Sign-in.** The UI and the API require an account. Admins add users from *Settings*. For automated
+  deployments, `-admin-email` and `-admin-password` create the first admin on start.
+- **Ingest token.** By default anyone who can reach the OTLP ports can send telemetry. Set
+  `-ingest-token` and have your SDKs or Collector send it with the standard variable:
+
+  ```sh
+  obsrv -ingest-token "$TOKEN"
+  OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer%20$TOKEN"   # on the client side
+  ```
+- **HTTPS.** Put obsrv behind a TLS reverse proxy and set `-public-url https://…`: session cookies are
+  then sent over HTTPS only.
 
 | Port | Purpose |
 |---|---|
@@ -124,8 +140,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318   # OTLP/HTTP, or :4317 for OT
 | 4318 | OTLP/HTTP (protobuf and JSON) |
 | 8080 | Web UI and `/api/v1` |
 
-Useful flags: `-data-dir` (default `./data`), `-retention` (default `168h`) and `-public-url`
-(used for links in alert notifications). Every flag can also
+Useful flags: `-data-dir` (default `./data`), `-retention` (default `168h`), `-public-url` (used
+for links in alert notifications and for secure cookies) and `-ingest-token`. Every flag can also
 be set with an environment variable: `-retention` is `OBSRV_RETENTION`. Run `obsrv -help` for the full list.
 
 ## Keep your data in your own bucket

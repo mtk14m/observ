@@ -60,7 +60,7 @@ demo-s3: ## Run the demo with telemetry stored in a MinIO bucket
 	@echo "obsrv: http://localhost:8080 · MinIO console: http://localhost:9001 (minioadmin/minioadmin)"
 
 screenshots: ## Regenerate the README screenshots from a running demo
-	./scripts/screenshots.sh
+	node scripts/screenshots.mjs
 
 demo-down: ## Stop the demo and delete its data
 	docker compose -f deploy/demo/docker-compose.yml -f deploy/demo/docker-compose.s3.yml down -v

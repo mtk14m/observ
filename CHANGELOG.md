@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Alerting: rules on log counts or metrics (optionally per group), with a waiting period, evaluated
   every `-alert-interval`; notifications to Slack and webhooks; an alerts page with live preview,
   channels and event history. Metadata is stored in an embedded SQLite database.
+- Authentication: accounts with bcrypt-hashed passwords, cookie sessions, first-run setup of the
+  admin account (or `-admin-email`/`-admin-password`), throttled sign-in, protection against
+  cross-site requests, admin and member roles, user management and password change in *Settings*.
+- `-ingest-token` requires OTLP clients to send `Authorization: Bearer <token>`.
+- Redesigned interface: icon rail, light and dark themes, search-first logs explorer with facets,
+  collapsible trace waterfall.
+
+### Security
+
+- The API and the UI now require signing in.
 
 ### Changed
 
