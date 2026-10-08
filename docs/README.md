@@ -6,6 +6,7 @@
 | [ROADMAP.md](ROADMAP.md) | Phases, exit criteria and current status |
 | [DESIGN.md](DESIGN.md) | Principles of the user interface |
 | [PRODUCT.md](PRODUCT.md) | Product vision, target users and positioning |
+| [UX.md](UX.md) | UX research (Datadog, Honeycomb, Grafana, Sentry, Linear…) and design direction |
 | [adr/](adr/) | Architecture Decision Records |
 | [../bench/RESULTS.md](../bench/RESULTS.md) | Benchmark results |
 
