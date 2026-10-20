@@ -5,7 +5,7 @@ go 1.27
 require (
 	github.com/duckdb/duckdb-go/v2 v2.10506.0
 	github.com/johannesboyne/gofakes3 v1.2.0
-	github.com/minio/minio-go/v7 v7.3.0
+	github.com/minio/minio-go/v7 v7.4.1
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/parquet-go/parquet-go v0.32.0
 	go.opentelemetry.io/collector/pdata v1.68.0
@@ -59,7 +59,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
 	golang.org/x/text v0.42.0 // indirect
