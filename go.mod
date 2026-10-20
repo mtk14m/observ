@@ -8,7 +8,7 @@ require (
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/parquet-go/parquet-go v0.32.0
-	go.opentelemetry.io/collector/pdata v1.68.0
+	go.opentelemetry.io/collector/pdata v1.69.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sync v0.23.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261005182115-fad411399dd8
@@ -53,13 +53,13 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	go.opentelemetry.io/collector/featuregate v1.68.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
 	go.shabbyrobe.org/gocovmerge v0.0.0-20230507111327-fa4f82cfbf4d // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
 	golang.org/x/text v0.42.0 // indirect
